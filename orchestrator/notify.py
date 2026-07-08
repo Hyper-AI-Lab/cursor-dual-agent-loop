@@ -32,16 +32,28 @@ def notify_owner(
 
     path: Path | None = None
     if write_needs_owner:
-        path = run_dir / "NEEDS_OWNER.md"
-        body = (
-            f"# Owner notification: {event}\n\n"
-            f"- **Task:** {task_id}\n"
-            f"- **Time (UTC):** {payload['utc_stamp']}\n\n"
-            f"## Summary\n\n{summary}\n\n"
-            f"## Resume\n\n"
-            f"1. Add your reply to `owner_reply` in the task config.yaml\n"
-            f"2. Run: `python auto/orchestrator/dual_agent_loop.py --config <config> --resume`\n"
-        )
+        if event == "complete":
+            path = run_dir / "COMPLETE.md"
+            body = (
+                f"# Task complete\n\n"
+                f"- **Task:** {task_id}\n"
+                f"- **Time (UTC):** {payload['utc_stamp']}\n\n"
+                f"## Summary\n\n{summary}\n\n"
+                f"## Next steps\n\n"
+                f"Review `git diff`, run verification locally, and commit if you want to keep the changes.\n"
+                f"No action is required to resume the loop.\n"
+            )
+        else:
+            path = run_dir / "NEEDS_OWNER.md"
+            body = (
+                f"# Owner notification: {event}\n\n"
+                f"- **Task:** {task_id}\n"
+                f"- **Time (UTC):** {payload['utc_stamp']}\n\n"
+                f"## Summary\n\n{summary}\n\n"
+                f"## Resume\n\n"
+                f"1. Add your reply to `owner_reply` in the task config.yaml\n"
+                f"2. Run: `python auto/orchestrator/dual_agent_loop.py --config <config> --resume`\n"
+            )
         path.write_text(body, encoding="utf-8")
 
     if webhook_url:

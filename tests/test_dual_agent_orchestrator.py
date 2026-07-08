@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
-from orchestrator.boundary import extract_tool_path, path_is_allowed
-from orchestrator.config import load_config, save_config
-from orchestrator.parse import extract_decision, extract_instruction
+from auto.orchestrator.boundary import extract_tool_path, path_is_allowed
+from auto.orchestrator.config import load_config, save_config
+from auto.orchestrator.parse import extract_decision, extract_instruction
 
 
 REPO = Path(__file__).resolve().parents[1]
-SANDBOX = REPO / "templates" / "auto" / "sandbox"
 
 
 def test_extract_decision_prefers_explicit_marker():
@@ -39,21 +39,25 @@ pytest -q
 
 
 def test_path_is_allowed_sandbox():
+    repo = REPO
+    sandbox = repo / "auto" / "sandbox"
     assert path_is_allowed(
-        REPO,
-        SANDBOX / "hello.py",
-        sandbox_dir=SANDBOX,
+        repo,
+        sandbox / "hello.py",
+        sandbox_dir=sandbox,
         allowed_paths=[],
     )
 
 
 def test_path_is_allowed_extra_path():
-    target = REPO / "app" / "routers" / "foo.py"
-    assert not path_is_allowed(REPO, target, sandbox_dir=SANDBOX, allowed_paths=[])
+    repo = REPO
+    sandbox = repo / "auto" / "sandbox"
+    target = repo / "app" / "routers" / "foo.py"
+    assert not path_is_allowed(repo, target, sandbox_dir=sandbox, allowed_paths=[])
     assert path_is_allowed(
-        REPO,
+        repo,
         target,
-        sandbox_dir=SANDBOX,
+        sandbox_dir=sandbox,
         allowed_paths=["app/routers/foo.py"],
     )
 
@@ -70,7 +74,7 @@ def test_load_and_save_config(tmp_path: Path):
                 "task_id": "t1",
                 "task": "Do something",
                 "repo_root": str(REPO),
-                "sandbox_dir": "templates/auto/sandbox",
+                "sandbox_dir": "auto/sandbox",
                 "backend": "cli",
             }
         ),
@@ -85,18 +89,20 @@ def test_load_and_save_config(tmp_path: Path):
     assert reloaded.last_iteration == 2
 
 
-def test_sandbox_boundary_hook_allows_orchestrator():
-    orchestrator_file = REPO / "orchestrator" / "dual_agent_loop.py"
+def test_sandbox_boundary_hook_allows_orchestrator(tmp_path: Path):
+    repo = REPO
+    sandbox = repo / "auto" / "sandbox"
+    orchestrator_file = repo / "auto" / "orchestrator" / "dual_agent_loop.py"
     assert path_is_allowed(
-        REPO,
+        repo,
         orchestrator_file,
-        sandbox_dir=SANDBOX,
-        allowed_paths=["orchestrator"],
+        sandbox_dir=sandbox,
+        allowed_paths=["auto/orchestrator"],
     )
 
 
 def test_notify_writes_needs_owner(tmp_path: Path):
-    from orchestrator.notify import notify_owner
+    from auto.orchestrator.notify import notify_owner
 
     path = notify_owner(
         tmp_path,
@@ -106,5 +112,24 @@ def test_notify_writes_needs_owner(tmp_path: Path):
         task_id="demo",
     )
     assert path is not None
+    assert path.name == "NEEDS_OWNER.md"
     assert path.exists()
     assert "owner_reply" in path.read_text(encoding="utf-8")
+
+
+def test_notify_writes_complete_on_stop(tmp_path: Path):
+    from auto.orchestrator.notify import notify_owner
+
+    path = notify_owner(
+        tmp_path,
+        "complete",
+        "DECISION: STOP\nTask done.",
+        write_needs_owner=True,
+        task_id="demo",
+    )
+    assert path is not None
+    assert path.name == "COMPLETE.md"
+    assert path.exists()
+    text = path.read_text(encoding="utf-8")
+    assert "Task complete" in text
+    assert "owner_reply" not in text

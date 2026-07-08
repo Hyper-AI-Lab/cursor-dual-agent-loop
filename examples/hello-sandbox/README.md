@@ -78,7 +78,7 @@ The loop does **not** commit. For a smoke test you can:
 
 - **Discard** (reset sandbox): `git checkout -- auto/sandbox/ 2>/dev/null; rm -f auto/sandbox/*.py`
 - **Keep** (record success): `git add auto/sandbox/*.py && git commit -m "hello-sandbox smoke test"`
-- **Ignore** `auto/runs/hello-sandbox/NEEDS_OWNER.md` on `STOP` — it is a completion log, not a request for input
+- On **STOP**, read `auto/runs/hello-sandbox/COMPLETE.md` (summary only; no resume needed)
 
 ## Run in background (screen)
 
