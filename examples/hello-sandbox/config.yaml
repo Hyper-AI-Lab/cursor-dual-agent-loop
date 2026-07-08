@@ -26,8 +26,8 @@ allowed_paths: []
 master_guidelines: auto/guidelines/master.md
 developer_guidelines: auto/guidelines/developer.md
 
-# Agent model
-model: composer-2.5
+# Agent model (use "auto" for Cursor Auto routing, or e.g. composer-2.5)
+model: auto
 
 # Backend: sdk (default) or cli
 backend: sdk

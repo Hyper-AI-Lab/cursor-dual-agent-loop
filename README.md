@@ -12,6 +12,13 @@ Sandbox hooks restrict file writes to `auto/sandbox/` plus configurable `allowed
 > **Requires:** Cursor account, `CURSOR_API_KEY`, Cursor CLI, and `cursor-sdk`.  
 > Not affiliated with Cursor Inc. See [Hyper AI Lab](https://hyperailab.com/).
 
+
+## Smoke test (recommended first run)
+
+See **[examples/hello-sandbox/README.md](examples/hello-sandbox/README.md)** for a step-by-step hello-world that should finish in ~2 iterations with `Decision: STOP`.
+
+Architecture overview: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
 ## Quick install into your repo
 
 ```bash
