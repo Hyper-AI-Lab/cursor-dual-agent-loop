@@ -1,0 +1,5 @@
+[project]
+name = "cursor-dual-agent-loop"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["cursor-sdk>=0.1.9", "pyyaml>=6.0"]

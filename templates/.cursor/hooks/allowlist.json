@@ -1,0 +1,8 @@
+{
+  "sandbox_dir": "auto/sandbox",
+  "allowed_paths": [
+    "auto/orchestrator",
+    "tests",
+    ".cursor/hooks"
+  ]
+}

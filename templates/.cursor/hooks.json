@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "bash .cursor/hooks/sandbox-boundary.sh",
+        "matcher": "Write|Delete",
+        "failClosed": true
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "bash .cursor/hooks/block-destructive-shell.sh",
+        "failClosed": true
+      }
+    ]
+  }
+}
