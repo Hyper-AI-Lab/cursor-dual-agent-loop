@@ -57,3 +57,9 @@ Recommended pattern:
 
 Configure with `master_model` and `developer_model` (both fall back to `model`).
 
+## Headless remote runs (close the laptop)
+
+Desktop Cursor agents often keep people tied to an open, awake machine — even when the repo is already on a server. That “leave the lid cracked” pattern does not scale to overnight or multi-hour jobs.
+
+This orchestrator runs as a normal remote process (Cursor SDK/CLI + Python). Start it in `screen`/`tmux`, walk away, and review `COMPLETE.md` later. No desktop GUI session required for the loop itself.
+

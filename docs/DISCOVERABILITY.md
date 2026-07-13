@@ -32,3 +32,10 @@ These cannot be fully automated from the repo alone:
 - multi-agent / master developer loop
 - headless Cursor automation
 - Auto mode quota / unattended coding agent
+
+## Messaging angles that convert
+
+- Auto quota unused because of **manual babysitting**
+- **Strong master / cheap developer** model split
+- **Headless remote overnight** runs vs keeping a laptop open for desktop Cursor
+

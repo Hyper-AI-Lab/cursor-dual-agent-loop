@@ -40,7 +40,8 @@ You stay out of the loop for routine work. The master escalates only when judgme
 
 - Cursor users with unused **Auto / agent quota** who want overnight or background progress  
 - Teams that want **bounded autonomous tasks** (refactors, docs, tests, small features) with a supervisor agent  
-- Anyone who wants **Cursor’s own agent engine** (SDK/CLI) without living in the desktop UI each turn  
+- Anyone who wants **Cursor’s own agent engine** (SDK/CLI) without living in the desktop UI each turn
+- People tired of **keeping a laptop open overnight** so a desktop Cursor session can finish  
 
 **Not for:** unsupervised production deploys, secret-handling experiments, or unbounded “rewrite everything” jobs without human gates.
 
@@ -57,6 +58,23 @@ master_model: composer-2.5  # fewer turns — prefer quality (any Cursor model i
 ```
 
 If you only set `model`, both agents use that same id.
+
+## Run overnight on a server — not on your open laptop
+
+A lot of people drive Cursor agents from the **desktop app** even when the code lives on a remote machine. That means leaving a laptop open (and awake) for hours — the internet’s unofficial “keep the lid propped” workflow:
+
+<p align="center">
+  <img src="docs/assets/keep-laptop-open-for-agents.svg" alt="Satirical illustration: keep your agents running 24/7 by propping the laptop open" width="720" />
+</p>
+
+<p align="center"><em>You shouldn’t need lid-props to ship overnight agent work.</em></p>
+
+**This loop is headless.** Start it on a VPS / remote workstation (screen/tmux/systemd), let it run for tens or hundreds of iterations, and check `COMPLETE.md` / the diff in the morning. Your local machine can sleep.
+
+| Approach | Where it runs | Your laptop |
+|----------|---------------|-------------|
+| Cursor desktop agent chat | Your GUI session | Must stay awake / open |
+| **This repo (SDK/CLI)** | Remote server process | Can close and walk away |
 
 ## How it works
 
