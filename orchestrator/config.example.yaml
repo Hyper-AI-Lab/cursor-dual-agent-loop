@@ -6,7 +6,14 @@
 
 task_id: my-task
 workspace: .
+
+# Shared default when developer_model / master_model are omitted
 model: auto
+
+# Cost tip: put a stronger (often more expensive) model on the master for review
+# quality, and keep the developer on auto / a cheaper model for execution volume.
+# developer_model: auto
+# master_model: composer-2.5   # example — use any Cursor model id you prefer
 
 # Orchestrator hard-stop only — never shown to the master as a completion budget
 max_iterations: 40

@@ -132,7 +132,7 @@ def _cli_master_text(config, prompt: str, *, mode: str | None = None) -> str:
     return call_agent_cli(
         prompt,
         cwd=config.workspace,
-        model=config.model,
+        model=config.master_model,
         force=False,
         mode=mode,
     )
@@ -295,7 +295,7 @@ async def run_developer_turn(
         dev_output = call_agent_cli(
             dev_prompt,
             cwd=config.developer_cwd,
-            model=config.model,
+            model=config.developer_model,
             force=force_dev,
             mode=("plan" if mode == "plan" else None),
         )
@@ -344,6 +344,8 @@ async def run_loop_async(config, *, resume: bool, force_dev: bool) -> int:
                 repo_root=config.workspace,
                 developer_cwd=config.developer_cwd,
                 model=config.model,
+                developer_model=config.developer_model,
+                master_model=config.master_model,
                 developer_agent_id=config.developer_agent_id if resume else None,
                 master_agent_id=config.master_agent_id if resume else None,
             )

@@ -241,3 +241,50 @@ def test_master_prompts_omit_iteration_budget():
     assert "fit a budget" in review
     # Protocol may name the config key only to tell the master to ignore it
     assert "kill-switch" in review or "orchestrator" in review.lower()
+
+
+def test_per_role_models(tmp_path: Path):
+    master = tmp_path / "master.md"
+    task = tmp_path / "task.md"
+    master.write_text("master context", encoding="utf-8")
+    task.write_text("do the thing", encoding="utf-8")
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        yaml.dump(
+            {
+                "task_id": "t-models",
+                "workspace": str(REPO),
+                "model": "auto",
+                "developer_model": "auto",
+                "master_model": "composer-2.5",
+                "backend": "cli",
+                "master_instructions": str(master),
+                "task": str(task),
+                "write_roots": ["."],
+                "safety_mode": "off",
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = load_config(cfg_file)
+    assert config.model == "auto"
+    assert config.developer_model == "auto"
+    assert config.master_model == "composer-2.5"
+
+    # Omitting per-role fields falls back to model
+    cfg_file.write_text(
+        yaml.dump(
+            {
+                "task_id": "t-models-2",
+                "workspace": str(REPO),
+                "model": "composer-2.5",
+                "backend": "cli",
+                "master_instructions": str(master),
+                "task": str(task),
+            }
+        ),
+        encoding="utf-8",
+    )
+    config2 = load_config(cfg_file)
+    assert config2.developer_model == "composer-2.5"
+    assert config2.master_model == "composer-2.5"

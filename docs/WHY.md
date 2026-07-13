@@ -45,3 +45,15 @@ Remove the human from:
 - Not a replacement for CI, code review, or production change control
 - Not affiliated with Cursor Inc.
 - Not a giant agent platform — intentionally small and installable into an existing repo
+
+## Cost asymmetry (strong master, cheap developer)
+
+Most loop cost is **developer turns** (implement / verify). Master turns are fewer but decide quality.
+
+Recommended pattern:
+
+- **Master** → larger / more capable (often more expensive) model for review integrity  
+- **Developer** → `auto` or a cheaper model for volume  
+
+Configure with `master_model` and `developer_model` (both fall back to `model`).
+

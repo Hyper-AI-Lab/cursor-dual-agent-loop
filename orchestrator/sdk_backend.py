@@ -21,12 +21,17 @@ async def create_sdk_agents(
     repo_root: Path,
     developer_cwd: Path,
     model: str,
+    developer_model: str | None = None,
+    master_model: str | None = None,
     developer_agent_id: str | None = None,
     master_agent_id: str | None = None,
 ) -> SdkAgents:
     api_key = os.environ.get("CURSOR_API_KEY")
     if not api_key:
         raise CursorAgentError("CURSOR_API_KEY is not set")
+
+    dev_model = developer_model or model
+    mst_model = master_model or model
 
     client = await AsyncClient.launch_bridge(workspace=str(repo_root))
 
@@ -36,12 +41,12 @@ async def create_sdk_agents(
     if developer_agent_id:
         developer = await client.resume_agent(
             developer_agent_id,
-            AgentOptions(api_key=api_key, model=model, local=local_dev),
+            AgentOptions(api_key=api_key, model=dev_model, local=local_dev),
         )
     else:
         developer = await client.create_agent(
             name="developer",
-            model=model,
+            model=dev_model,
             api_key=api_key,
             local=local_dev,
         )
@@ -49,12 +54,12 @@ async def create_sdk_agents(
     if master_agent_id:
         master = await client.resume_agent(
             master_agent_id,
-            AgentOptions(api_key=api_key, model=model, local=local_master),
+            AgentOptions(api_key=api_key, model=mst_model, local=local_master),
         )
     else:
         master = await client.create_agent(
             name="master",
-            model=model,
+            model=mst_model,
             api_key=api_key,
             local=local_master,
         )

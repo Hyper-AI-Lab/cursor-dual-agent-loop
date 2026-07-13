@@ -46,6 +46,18 @@ You stay out of the loop for routine work. The master escalates only when judgme
 
 ---
 
+## Cost tip: split models by role
+
+A clear win of the dual-agent design: put a **stronger / more expensive model on the master** (planning + review) and keep the **developer on `auto` or a cheaper model** (most of the turn volume is execution).
+
+```yaml
+model: auto                 # fallback if per-role fields omitted
+developer_model: auto       # high volume — prefer cheap / auto
+master_model: composer-2.5  # fewer turns — prefer quality (any Cursor model id)
+```
+
+If you only set `model`, both agents use that same id.
+
 ## How it works
 
 ```mermaid
@@ -113,7 +125,8 @@ task: path/to/task.md
 | Field | Meaning |
 |-------|---------|
 | `workspace` | Directory agents work in |
-| `model` | Cursor model id (e.g. `auto`) |
+| `model` | Shared Cursor model id (fallback) |
+| `developer_model` / `master_model` | Optional per-role overrides (cheap/`auto` developer + stronger master) |
 | `max_iterations` | Orchestrator kill-switch (hidden from master) |
 | `master_instructions` | File 1 — master context / how to supervise |
 | `task` | File 2 — goal the master uses to drive the developer |
