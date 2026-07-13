@@ -99,13 +99,23 @@ Owner task (goals / targets / how to drive the developer):
 
 Loop budget: up to {max_iterations} developer-master iterations after this bootstrap.
 
-Return DECISION, INSTRUCTION_FOR_DEVELOPER, REASON, and CHECKS_REQUIRED.
+Your entire reply MUST be exactly these sections (no other preamble or status text):
+
+DECISION: CONTINUE
+
+INSTRUCTION_FOR_DEVELOPER:
+<exact first prompt for the developer>
+
+REASON:
+<short explanation>
+
+CHECKS_REQUIRED:
+<checks for this step, or none>
 
 Important:
 - Prefer DECISION: CONTINUE with the first developer step, unless escalate policy applies.
 - Do not return STOP unless the task is already complete with no work needed.
-- INSTRUCTION_FOR_DEVELOPER must be the exact prompt the developer should execute next.
-- Your reply MUST include a line: DECISION: CONTINUE|FIX|STOP|ESCALATE
+- Do not reply with only a planning status sentence — the orchestrator parses DECISION strictly.
 """.strip()
 
 
@@ -153,6 +163,9 @@ Return DECISION, INSTRUCTION_FOR_DEVELOPER, REASON, and CHECKS_REQUIRED.
 
 Important:
 - Inspect artifacts when claims matter; do not trust developer prose alone.
+- If the developer asked a multiple-choice / Needs decision question, answer it in
+  INSTRUCTION_FOR_DEVELOPER (or ESCALATE to the owner when required).
+- Optionally set DEVELOPER_MODE: agent|plan for the next developer turn (default agent).
 - Return STOP only if the task is complete by your derived criteria.
 - Return ESCALATE only when the escalate policy applies.
 - Otherwise return CONTINUE or FIX with the exact next developer instruction.

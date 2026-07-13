@@ -1,33 +1,65 @@
-# Minimal dual-agent loop config
-# Required: workspace, model, max_iterations, master_instructions, task
+# Dual-agent loop config
+
+# =============================================================================
+# Should be configured by the user
+# =============================================================================
 
 task_id: my-task
+
+# Directory agents work in ("." = repo containing auto/orchestrator)
 workspace: .
+
+# Cursor model id (e.g. auto, composer-2.5)
 model: auto
+
+# Hard stop after this many developer↔master iterations (bootstrap does not count)
 max_iterations: 40
+
+# File 1 — master context / operating knowledge
+master_instructions: auto/runs/my-task/instruction_for_master
+
+# File 2 — task / goals (path to file, or inline multiline string)
+task: auto/runs/my-task/instruction_for_master_to_guide_developer
+
+# =============================================================================
+# Default parameters (safe to leave as-is; override when needed)
+# =============================================================================
+
+# Orchestration transport: sdk (durable agents, recommended) | cli
 backend: sdk
 
-# Default: agents may write anywhere under workspace
+# Paths relative to workspace where Write/Delete are allowed ("." = whole workspace)
 write_roots:
   - .
 
-# off (default): no hard shell denylist; soft safety lives in safety_guidelines
-# soft: same as off for hooks
-# strict: enable hard denylist (git push, rm -rf /, DROP TABLE, ...)
+# Shell hard-blocks: "off" | soft | strict  (quote "off" — YAML treats bare off as false)
 safety_mode: "off"
-safety_guidelines: default   # or path to a markdown file
-escalate_policy: default     # or path to a markdown file
 
-# File 1: master context / how the master should think
-master_instructions: auto/runs/my-task/instruction_for_master
+# Soft safety text: "default" = auto/orchestrator/builtin/default_safety.md, or a path
+safety_guidelines: default
 
-# File 2: task the master uses to drive the developer (path or inline text)
-task: auto/runs/my-task/instruction_for_master_to_guide_developer
+# When master should ESCALATE: "default" = builtin/default_escalate.md, or a path
+escalate_policy: default
 
+# Optional verification commands included in repo state for the master (null = skip)
+test_command: null
+lint_command: null
 
+# Owner answer after ESCALATE / review; cleared after one use on --resume
 owner_reply: null
-run_dir: null   # default: auto/runs/<task_id>
 
 notify:
+  # Write COMPLETE.md / NEEDS_OWNER.md under run_dir
   write_needs_owner: true
+  # Optional HTTP webhook URL for stop/escalate events
   webhook_url: null
+
+# Logs + notifications directory (null = auto/runs/<task_id>/)
+#   developer.log, master.log, state_NNN.txt, COMPLETE.md, NEEDS_OWNER.md
+run_dir: null
+
+# Runtime / resume (orchestrator updates these; edit only when resuming)
+developer_agent_id: null
+master_agent_id: null
+last_iteration: 0
+last_instruction: null

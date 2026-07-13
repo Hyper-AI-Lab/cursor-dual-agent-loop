@@ -8,7 +8,7 @@ import yaml
 
 from auto.orchestrator.boundary import extract_tool_path, path_is_allowed
 from auto.orchestrator.config import load_config, save_config
-from auto.orchestrator.parse import extract_decision, extract_instruction
+from auto.orchestrator.parse import extract_decision, extract_developer_mode, extract_instruction
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -192,7 +192,8 @@ def test_master_bootstrap_prompts():
     )
     assert "bootstrap step 2" in task.lower() or "Bootstrap step 2" in task
     assert "Explore Phase 0." in task
-    assert "DECISION: CONTINUE|FIX|STOP|ESCALATE" in task
+    assert "DECISION: CONTINUE" in task
+    assert "INSTRUCTION_FOR_DEVELOPER:" in task
 
 
 def test_master_ready_helper():
@@ -200,3 +201,14 @@ def test_master_ready_helper():
 
     assert _master_ready("READY: yes\nSUMMARY:\n- a\n- b")
     assert not _master_ready("nope")
+
+
+def test_extract_developer_mode():
+    text = """DECISION: CONTINUE
+DEVELOPER_MODE: plan
+INSTRUCTION_FOR_DEVELOPER:
+Do research only.
+"""
+    assert extract_developer_mode(text) == "plan"
+    assert extract_instruction(text) == "Do research only."
+    assert extract_developer_mode("DECISION: CONTINUE\nNo mode here") is None

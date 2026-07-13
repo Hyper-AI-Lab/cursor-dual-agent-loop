@@ -62,16 +62,30 @@ async def create_sdk_agents(
     return SdkAgents(client=client, developer=developer, master=master)
 
 
-async def send_developer(agents: SdkAgents, prompt: str) -> str:
-    run = await agents.developer.send(prompt)
+async def send_developer(
+    agents: SdkAgents, prompt: str, *, mode: str | None = None
+) -> str:
+    """Send to developer. mode=None|agent -> agent mode; mode=plan -> Plan Mode."""
+    if mode and mode.lower() == "plan":
+        run = await agents.developer.send(prompt, SendOptions(mode="plan"))
+    else:
+        run = await agents.developer.send(prompt)
     result = await run.wait()
     if result.status == "error":
         raise RuntimeError(f"developer run failed: {getattr(result, 'id', 'unknown')}")
     return (await run.text()).strip()
 
 
-async def send_master(agents: SdkAgents, prompt: str) -> str:
-    run = await agents.master.send(prompt, SendOptions(mode="plan"))
+async def send_master(agents: SdkAgents, prompt: str, *, mode: str | None = None) -> str:
+    """Send to master. Default agent mode so replies include full DECISION blocks.
+
+    Pass mode="plan" only if you explicitly want Plan Mode (often returns short
+    planning status text without DECISION: CONTINUE|FIX|STOP|ESCALATE).
+    """
+    if mode:
+        run = await agents.master.send(prompt, SendOptions(mode=mode))
+    else:
+        run = await agents.master.send(prompt)
     result = await run.wait()
     if result.status == "error":
         raise RuntimeError(f"master run failed: {getattr(result, 'id', 'unknown')}")

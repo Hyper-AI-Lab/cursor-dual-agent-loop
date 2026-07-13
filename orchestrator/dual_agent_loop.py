@@ -21,7 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 from auto.orchestrator.cli_backend import call_agent_cli
 from auto.orchestrator.config import load_config, save_config
 from auto.orchestrator.notify import notify_owner
-from auto.orchestrator.parse import extract_decision, extract_instruction
+from auto.orchestrator.parse import extract_decision, extract_developer_mode, extract_instruction
 from auto.orchestrator.prompts import (
     build_developer_prompt,
     build_master_context_prompt,
@@ -127,13 +127,14 @@ def _persist_agent_ids(config, agents) -> None:
         save_config(config)
 
 
-def _cli_master_text(config, prompt: str) -> str:
+def _cli_master_text(config, prompt: str, *, mode: str | None = None) -> str:
+    # Default: no --mode plan, so the model returns a full DECISION block.
     return call_agent_cli(
         prompt,
         cwd=config.workspace,
         model=config.model,
         force=False,
-        mode="plan",
+        mode=mode,
     )
 
 
@@ -185,8 +186,36 @@ async def bootstrap_master(config, agents) -> tuple[str | None, int | None]:
     _persist_agent_ids(config, agents)
 
     decision = extract_decision(task_out)
+    boot_mode = extract_developer_mode(task_out)
+    if boot_mode:
+        config.last_developer_mode = boot_mode
+    if decision is None:
+        # One corrective retry — plan-mode/status-only replies are common failures
+        retry_prompt = (
+            "Your previous reply was invalid for the orchestrator.\n"
+            "Reply again with ONLY this exact structure (no status preamble):\n\n"
+            "DECISION: CONTINUE\n\n"
+            "INSTRUCTION_FOR_DEVELOPER:\n"
+            "<first concrete developer step from the owner task>\n\n"
+            "REASON:\n"
+            "<short>\n\n"
+            "CHECKS_REQUIRED:\n"
+            "<checks or none>\n"
+        )
+        print("\n=== BOOTSTRAP 2/2 retry: require DECISION block ===")
+        if agents is not None:
+            task_out = await send_master(agents, retry_prompt)
+        else:
+            task_out = _cli_master_text(config, retry_prompt)
+        append_log(config.run_dir / "master.log", "BOOTSTRAP 2/2 TASK RETRY", task_out)
+        _persist_agent_ids(config, agents)
+        decision = extract_decision(task_out)
+        boot_mode = extract_developer_mode(task_out) or boot_mode
+        if boot_mode:
+            config.last_developer_mode = boot_mode
+
     instruction = extract_instruction(task_out)
-    config.last_instruction = instruction
+    config.last_instruction = instruction if decision else None
     if config.config_path:
         save_config(config)
 
@@ -226,11 +255,23 @@ async def bootstrap_master(config, agents) -> tuple[str | None, int | None]:
         )
         return None, 0
 
+    if boot_mode:
+        config.last_developer_mode = boot_mode
+    elif config.last_developer_mode is None:
+        config.last_developer_mode = "agent"
+    if config.config_path:
+        save_config(config)
     return instruction, None
 
 
 async def run_developer_turn(
-    config, agents, iteration: int, instruction: str, *, force_dev: bool
+    config,
+    agents,
+    iteration: int,
+    instruction: str,
+    *,
+    force_dev: bool,
+    developer_mode: str | None = None,
 ) -> str:
     _protocol, developer_protocol, _escalate, safety = _prompt_parts(config)
     inject_owner = None
@@ -248,16 +289,24 @@ async def run_developer_turn(
         owner_reply=inject_owner,
         safety_guidelines=safety,
     )
+    mode = (developer_mode or config.last_developer_mode or "agent").lower()
+    if mode not in {"agent", "plan"}:
+        mode = "agent"
     if agents is not None:
-        dev_output = await send_developer(agents, dev_prompt)
+        dev_output = await send_developer(agents, dev_prompt, mode=mode)
     else:
         dev_output = call_agent_cli(
             dev_prompt,
             cwd=config.developer_cwd,
             model=config.model,
             force=force_dev,
+            mode=("plan" if mode == "plan" else None),
         )
-    append_log(config.run_dir / "developer.log", f"ITERATION {iteration}", dev_output)
+    append_log(
+        config.run_dir / "developer.log",
+        f"ITERATION {iteration} (mode={mode})",
+        dev_output,
+    )
     _persist_agent_ids(config, agents)
     return dev_output
 
@@ -315,15 +364,26 @@ async def run_loop_async(config, *, resume: bool, force_dev: bool) -> int:
             assert instruction is not None
             start = 1
 
+        developer_mode = config.last_developer_mode or "agent"
         for iteration in range(start, config.max_iterations + 1):
+            print(f"\n--- Developer turn {iteration} (mode={developer_mode}) ---")
             dev_output = await run_developer_turn(
-                config, agents, iteration, instruction, force_dev=force_dev
+                config,
+                agents,
+                iteration,
+                instruction,
+                force_dev=force_dev,
+                developer_mode=developer_mode,
             )
             master_output = await run_master_review_turn(
                 config, agents, iteration, dev_output
             )
             decision = extract_decision(master_output)
             instruction = extract_instruction(master_output)
+            next_mode = extract_developer_mode(master_output)
+            if next_mode:
+                developer_mode = next_mode
+            config.last_developer_mode = developer_mode
             exit_code, stop = _handle_decision(
                 config, iteration, decision, instruction, master_output
             )

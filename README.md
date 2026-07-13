@@ -78,6 +78,11 @@ See `orchestrator/config.example.yaml` / `templates/auto/orchestrator/config.exa
 - `safety_mode: strict`: hard-block a short denylist (`git push`, `rm -rf /`, …).
 - `write_roots` bounds Write/Delete.
 
+## Developer mode + choices
+
+- Master may set `DEVELOPER_MODE: agent|plan` each turn (default `agent`).
+- Developer multiple-choice needs appear as `STATUS: Needs decision` text; master answers or ESCALATEs.
+
 ## Monitor / stop / resume
 
 | Action | How |

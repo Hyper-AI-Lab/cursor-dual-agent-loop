@@ -41,6 +41,7 @@ class LoopConfig:
     master_agent_id: str | None = None
     last_iteration: int = 0
     last_instruction: str | None = None
+    last_developer_mode: str | None = None
     config_path: Path | None = None
     # Legacy aliases kept for internal helpers
     repo_root: Path = field(init=False)
@@ -214,6 +215,7 @@ def load_config(config_path: Path) -> LoopConfig:
         master_agent_id=raw.get("master_agent_id"),
         last_iteration=int(raw.get("last_iteration", 0)),
         last_instruction=raw.get("last_instruction"),
+        last_developer_mode=(raw.get("last_developer_mode") or None),
         config_path=config_path.resolve(),
     )
 
@@ -254,6 +256,7 @@ def save_config(config: LoopConfig) -> None:
         "master_agent_id": config.master_agent_id,
         "last_iteration": config.last_iteration,
         "last_instruction": config.last_instruction,
+        "last_developer_mode": config.last_developer_mode,
     }
     if config.task_file and config.task_file.exists():
         data["task"] = _as_rel(config.workspace, config.task_file)
