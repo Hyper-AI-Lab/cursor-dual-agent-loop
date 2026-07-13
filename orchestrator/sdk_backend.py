@@ -67,7 +67,7 @@ async def create_sdk_agents(
     return SdkAgents(client=client, developer=developer, master=master)
 
 
-def _format_run_failure(role: str, result: object) -> str:
+def _format_run_failure(role: str, result: object, *, extra: str = "") -> str:
     """Build an actionable error from a failed SDK run result."""
     run_id = getattr(result, "id", None) or "unknown"
     status = getattr(result, "status", None)
@@ -81,12 +81,45 @@ def _format_run_failure(role: str, result: object) -> str:
         parts.append(f"model={model_id!r}")
     if detail:
         parts.append(detail)
+    elif extra:
+        parts.append(extra)
     else:
         parts.append(
-            "No error detail from SDK. Check model id with: "
-            "python auto/orchestrator/list_models.py"
+            "No error detail from SDK. If this is grok-4.5 on an EU host, "
+            "Cursor docs say Grok 4.5 is unavailable in the EU — try model: auto "
+            "or composer-2.5. Otherwise run: python auto/orchestrator/list_models.py"
         )
     return " | ".join(parts)
+
+
+async def _failure_hint_from_run(run: object, result: object) -> str:
+    """Best-effort extra context when RunResult.result is empty."""
+    hints: list[str] = []
+    model = getattr(result, "model", None)
+    model_id = getattr(model, "id", None) if model is not None else None
+    if model_id and str(model_id).startswith("grok"):
+        hints.append(
+            "Grok models may be blocked in the EU even when list_models() returns them"
+        )
+    try:
+        observe = getattr(run, "observe", None)
+        if observe is not None:
+            async for ev in observe():
+                payload = getattr(ev, "result", None)
+                if isinstance(payload, dict):
+                    status = payload.get("status")
+                    if status:
+                        hints.append(f"lifecycle={status}")
+                    # Some failures put a message under common keys
+                    for key in ("error", "message", "errorMessage", "reason"):
+                        if payload.get(key):
+                            hints.append(str(payload[key]))
+                kind = getattr(ev, "kind", None)
+                if kind == "done":
+                    break
+    except Exception as exc:
+        hints.append(f"observe_failed={type(exc).__name__}")
+    return "; ".join(hints)
 
 
 async def send_developer(
@@ -99,7 +132,10 @@ async def send_developer(
         run = await agents.developer.send(prompt)
     result = await run.wait()
     if result.status == "error":
-        raise RuntimeError(_format_run_failure("developer", result))
+        extra = ""
+        if not (getattr(result, "result", None) or "").strip():
+            extra = await _failure_hint_from_run(run, result)
+        raise RuntimeError(_format_run_failure("developer", result, extra=extra))
     return (await run.text()).strip()
 
 
@@ -115,7 +151,10 @@ async def send_master(agents: SdkAgents, prompt: str, *, mode: str | None = None
         run = await agents.master.send(prompt)
     result = await run.wait()
     if result.status == "error":
-        raise RuntimeError(_format_run_failure("master", result))
+        extra = ""
+        if not (getattr(result, "result", None) or "").strip():
+            extra = await _failure_hint_from_run(run, result)
+        raise RuntimeError(_format_run_failure("master", result, extra=extra))
     return (await run.text()).strip()
 
 
