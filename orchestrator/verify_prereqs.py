@@ -8,7 +8,11 @@ import shutil
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+_HERE = Path(__file__).resolve()
+if _HERE.parent.name == "orchestrator" and _HERE.parents[1].name == "auto":
+    REPO_ROOT = _HERE.parents[2]
+else:
+    REPO_ROOT = _HERE.parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 

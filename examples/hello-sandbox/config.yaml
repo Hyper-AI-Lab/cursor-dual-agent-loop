@@ -1,64 +1,24 @@
-# Dual-agent loop configuration example.
-# Copy to auto/runs/<task-id>/config.yaml and adjust.
-
 task_id: hello-sandbox
-
-# Task description (or path to brief.md)
+workspace: .
+model: auto
+max_iterations: 8
+backend: sdk
+write_roots:
+  - auto/sandbox
+safety_mode: "off"
+safety_guidelines: default
+escalate_policy: default
+master_instructions: auto/guidelines/master.md
 task: |
   Create auto/sandbox/hello.py with a greet(name) function returning "Hello, {name}!".
   Add auto/sandbox/test_hello.py with pytest tests. Run pytest on the sandbox tests.
-
-# Optional: path to brief.md (overrides task if set)
-# brief_file: auto/runs/hello-sandbox/brief.md
-
-repo_root: .
-
-# Sandbox directory relative to repo_root
-sandbox_dir: auto/sandbox
-
-# Mode: greenfield (cwd=sandbox) or constrained (cwd=repo_root + hooks allowlist)
-workspace_mode: constrained
-
-# Extra paths the developer may edit (relative to repo_root)
-allowed_paths: []
-
-# Guidelines files (relative to repo_root)
-master_guidelines: auto/guidelines/master.md
-developer_guidelines: auto/guidelines/developer.md
-
-# Agent model (use "auto" for Cursor Auto routing, or e.g. composer-2.5)
-model: auto
-
-# Backend: sdk (default) or cli
-backend: sdk
-
-# Verification commands (optional)
-test_command: "PYTHONPATH=. pytest auto/sandbox/test_hello.py -q"
-lint_command: null
-
-# Loop limits
-max_iterations: 8
-max_consecutive_fixes: 3
-
-# Initial instruction for first developer turn
 initial_instruction: |
   Start the task. Inspect the codebase, identify the first implementation step,
   make the smallest useful change, verify it, and stop.
-
-# Owner reply injected on resume after ESCALATE (set before --resume)
-# owner_reply: |
-#   Use greet() without punctuation in the greeting.
-
-# Notification settings
+owner_reply: null
+test_command: PYTHONPATH=. pytest auto/sandbox/test_hello.py -q
+lint_command: null
 notify:
   write_needs_owner: true
   webhook_url: null
-
-# Run directory (auto-created under auto/runs/<task_id>/ if not set)
-run_dir: null
-
-# Resume state (populated by orchestrator)
-developer_agent_id: null
-master_agent_id: null
-last_iteration: 0
-last_instruction: null
+run_dir: auto/runs/hello-sandbox

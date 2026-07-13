@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
 from auto.orchestrator.boundary import extract_tool_path, path_is_allowed
@@ -25,6 +24,11 @@ def test_extract_decision_fix_before_continue():
     assert extract_decision(text) == "FIX"
 
 
+def test_extract_decision_missing_returns_none():
+    text = "I think we should continue somehow."
+    assert extract_decision(text) is None
+
+
 def test_extract_instruction_strips_trailing_sections():
     text = """
 DECISION: CONTINUE
@@ -38,44 +42,55 @@ pytest -q
     assert extract_instruction(text) == "Implement the next step."
 
 
-def test_path_is_allowed_sandbox():
+def test_path_is_allowed_workspace_root():
     repo = REPO
-    sandbox = repo / "auto" / "sandbox"
     assert path_is_allowed(
         repo,
-        sandbox / "hello.py",
-        sandbox_dir=sandbox,
-        allowed_paths=[],
+        repo / "app" / "routers" / "assets.py",
+        write_roots=["."],
     )
 
 
-def test_path_is_allowed_extra_path():
+def test_path_is_allowed_narrow_roots():
     repo = REPO
-    sandbox = repo / "auto" / "sandbox"
     target = repo / "app" / "routers" / "foo.py"
-    assert not path_is_allowed(repo, target, sandbox_dir=sandbox, allowed_paths=[])
+    assert not path_is_allowed(repo, target, write_roots=["auto/sandbox"])
     assert path_is_allowed(
         repo,
-        target,
-        sandbox_dir=sandbox,
-        allowed_paths=["app/routers/foo.py"],
+        repo / "auto" / "sandbox" / "hello.py",
+        write_roots=["auto/sandbox"],
     )
+
+
+def test_path_is_allowed_auto_runs_implicit():
+    repo = REPO
+    target = repo / "auto" / "runs" / "my-task" / "config.yaml"
+    assert path_is_allowed(repo, target, write_roots=["auto/sandbox"])
 
 
 def test_extract_tool_path_write():
     assert extract_tool_path("Write", {"path": "auto/sandbox/x.py"}) == "auto/sandbox/x.py"
 
 
-def test_load_and_save_config(tmp_path: Path):
+def test_load_minimal_config_and_save(tmp_path: Path):
+    master = tmp_path / "master.md"
+    task = tmp_path / "task.md"
+    master.write_text("master context", encoding="utf-8")
+    task.write_text("do the thing", encoding="utf-8")
+    # Place config under a fake runs dir but point workspace via absolute path in yaml
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(
         yaml.dump(
             {
                 "task_id": "t1",
-                "task": "Do something",
-                "repo_root": str(REPO),
-                "sandbox_dir": "auto/sandbox",
+                "workspace": str(REPO),
+                "model": "auto",
+                "max_iterations": 5,
                 "backend": "cli",
+                "master_instructions": str(master),
+                "task": str(task),
+                "write_roots": ["."],
+                "safety_mode": "off",
             }
         ),
         encoding="utf-8",
@@ -83,22 +98,29 @@ def test_load_and_save_config(tmp_path: Path):
     config = load_config(cfg_file)
     assert config.task_id == "t1"
     assert config.backend == "cli"
+    assert config.task == "do the thing"
+    assert config.safety_mode == "off"
+    assert "max_consecutive_fixes" not in config.__dataclass_fields__
     config.last_iteration = 2
     save_config(config)
     reloaded = load_config(cfg_file)
     assert reloaded.last_iteration == 2
+    assert reloaded.task == "do the thing"
 
 
-def test_sandbox_boundary_hook_allows_orchestrator(tmp_path: Path):
-    repo = REPO
-    sandbox = repo / "auto" / "sandbox"
-    orchestrator_file = repo / "auto" / "orchestrator" / "dual_agent_loop.py"
-    assert path_is_allowed(
-        repo,
-        orchestrator_file,
-        sandbox_dir=sandbox,
-        allowed_paths=["auto/orchestrator"],
-    )
+def test_load_explore_1_config():
+    import pytest
+
+    cfg = REPO / "auto" / "runs" / "explore_1" / "config.yaml"
+    if not cfg.exists():
+        pytest.skip("explore_1 run config only present in DarkHerd checkout")
+    config = load_config(cfg)
+    assert config.task_id == "explore_1"
+    assert config.workspace == REPO
+    assert config.write_roots == ["."]
+    assert config.safety_mode == "off"
+    assert "Phase 0" in config.task or "Phase 1" in config.task
+    assert config.master_instructions.exists()
 
 
 def test_notify_writes_needs_owner(tmp_path: Path):
@@ -133,3 +155,17 @@ def test_notify_writes_complete_on_stop(tmp_path: Path):
     text = path.read_text(encoding="utf-8")
     assert "Task complete" in text
     assert "owner_reply" not in text
+
+
+def test_notify_invalid_decision(tmp_path: Path):
+    from auto.orchestrator.notify import notify_owner
+
+    path = notify_owner(
+        tmp_path,
+        "invalid_decision",
+        "no decision line",
+        write_needs_owner=True,
+        task_id="demo",
+    )
+    assert path is not None
+    assert path.name == "NEEDS_OWNER.md"

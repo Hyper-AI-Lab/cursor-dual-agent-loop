@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+# Always writable for run scaffolding/logs even when write_roots is narrowed.
+IMPLICIT_ALLOWED_PATHS = ("auto/runs",)
+
 
 def normalize_repo_path(repo_root: Path, path: str | Path) -> Path:
     candidate = Path(path)
@@ -14,33 +17,38 @@ def normalize_repo_path(repo_root: Path, path: str | Path) -> Path:
     return candidate
 
 
+def _under(child: Path, parent: Path) -> bool:
+    try:
+        child.relative_to(parent)
+        return True
+    except ValueError:
+        return child == parent
+
+
 def path_is_allowed(
     repo_root: Path,
     target: str | Path,
     *,
-    sandbox_dir: Path,
-    allowed_paths: list[str],
+    sandbox_dir: Path | None = None,
+    allowed_paths: list[str] | None = None,
+    write_roots: list[str] | None = None,
 ) -> bool:
     resolved = normalize_repo_path(repo_root, target)
     repo_root = repo_root.resolve()
-    sandbox_dir = sandbox_dir.resolve()
 
-    try:
-        resolved.relative_to(sandbox_dir)
+    if sandbox_dir is not None and _under(resolved, sandbox_dir.resolve()):
         return True
-    except ValueError:
-        pass
 
-    for rel in allowed_paths:
+    roots = list(write_roots if write_roots is not None else (allowed_paths or []))
+
+    # Whole workspace
+    if not roots or "." in roots or "" in roots:
+        return _under(resolved, repo_root)
+
+    for rel in (*IMPLICIT_ALLOWED_PATHS, *roots):
         allowed = normalize_repo_path(repo_root, rel)
-        try:
-            if allowed.is_dir():
-                resolved.relative_to(allowed)
-                return True
-            if resolved == allowed:
-                return True
-        except ValueError:
-            continue
+        if _under(resolved, allowed) or resolved == allowed:
+            return True
     return False
 
 

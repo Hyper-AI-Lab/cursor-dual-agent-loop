@@ -4,20 +4,34 @@ Headless **master + developer** autonomous loop for [Cursor](https://cursor.com)
 
 A Python orchestrator alternates two Cursor agents:
 
-1. **Developer** — implements one step, runs verification, reports structured output.
-2. **Master** — reviews diff/tests and returns `CONTINUE`, `FIX`, `STOP`, or `ESCALATE`.
-
-Sandbox hooks restrict file writes to `auto/sandbox/` plus configurable `allowed_paths`.
+1. **Developer** — implements one step, verifies, reports structured output.
+2. **Master** — reviews artifacts/output and returns `CONTINUE`, `FIX`, `STOP`, or `ESCALATE`.
 
 > **Requires:** Cursor account, `CURSOR_API_KEY`, Cursor CLI, and `cursor-sdk`.  
 > Not affiliated with Cursor Inc. See [Hyper AI Lab](https://hyperailab.com/).
 
+## What you provide
+
+In `config.yaml`:
+
+| Field | Meaning |
+|-------|---------|
+| `workspace` | Directory agents work in (default `.`) |
+| `model` | e.g. `auto` |
+| `max_iterations` | Hard stop budget |
+| `master_instructions` | File 1 — master context / how to think |
+| `task` | File 2 (path) or inline text — goal the master uses to drive the developer |
+
+Optional: `write_roots` (default whole workspace), `safety_mode` (`"off"` default), `run_dir`, `backend`.
+
+Built-in (not user homework): DECISION protocol, escalate policy, soft safety guidelines.
+Force-stop anytime with `Ctrl+C`.
 
 ## Smoke test (recommended first run)
 
-See **[examples/hello-sandbox/README.md](examples/hello-sandbox/README.md)** for a step-by-step hello-world that should finish in ~2 iterations with `Decision: STOP`.
+See **[examples/hello-sandbox/README.md](examples/hello-sandbox/README.md)**.
 
-Architecture overview: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+Architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 ## Quick install into your repo
 
@@ -26,7 +40,7 @@ git clone https://github.com/Hyper-AI-Lab/cursor-dual-agent-loop.git
 ./cursor-dual-agent-loop/scripts/install-into-repo.sh /path/to/your-project
 
 cd /path/to/your-project
-export CURSOR_API_KEY="cursor_..."   # from Cursor Dashboard -> Integrations
+export CURSOR_API_KEY="cursor_..."
 pip install cursor-sdk pyyaml
 curl https://cursor.com/install -fsS | bash
 python auto/orchestrator/verify_prereqs.py
@@ -36,38 +50,45 @@ python auto/orchestrator/dual_agent_loop.py \
   --backend sdk
 ```
 
-## Layout after install
+## Minimal config example
 
+```yaml
+task_id: my-task
+workspace: .
+model: auto
+max_iterations: 40
+backend: sdk
+write_roots: ["."]
+safety_mode: "off"
+master_instructions: path/to/instruction_for_master.md
+task: path/to/task_for_developer.md
 ```
-your-project/
-  auto/orchestrator/     # Python orchestrator
-  auto/guidelines/       # Master/developer policy
-  auto/sandbox/          # Developer workspace
-  auto/runs/<task>/      # Per-task config + logs
-  .cursor/agents/        # Cursor agent roles
-  .cursor/hooks/         # Sandbox + shell safety
-```
 
-## Configuration
+See `orchestrator/config.example.yaml` / `templates/auto/orchestrator/config.example.yaml`.
 
-Copy `auto/orchestrator/config.example.yaml` to `auto/runs/my-task/config.yaml`.
+## Safety
 
-Key fields: `task`, `test_command`, `allowed_paths`, `max_iterations`, `backend` (`sdk` or `cli`).
+- `safety_mode: "off"` / `soft` (default off): no hard shell denylist; soft rules from `safety_guidelines` (do not leak secrets).
+- `safety_mode: strict`: hard-block a short denylist (`git push`, `rm -rf /`, …).
+- `write_roots` bounds Write/Delete.
 
 ## Monitor / stop / resume
 
 | Action | How |
 |--------|-----|
 | Monitor | `tail -f auto/runs/<task>/master.log` |
-| Stop | `Ctrl+C` or kill orchestrator PID |
-| Resume after ESCALATE | Add `owner_reply` to config, run with `--resume` |
+| Stop | `Ctrl+C` or kill orchestrator / screen session |
+| Resume | Add `owner_reply` to config, run with `--resume` |
 
-See [SYNC.md](SYNC.md) for maintainer sync with downstream projects.
+Invalid/missing `DECISION:` lines also stop and write `NEEDS_OWNER.md`.
+
+See [SYNC.md](SYNC.md) for maintainer sync.
 
 ## Development (this repo)
 
 ```bash
 pip install cursor-sdk pyyaml pytest
+# auto/orchestrator is a symlink to ./orchestrator for imports
 PYTHONPATH=. pytest tests/ -q
 ```
 

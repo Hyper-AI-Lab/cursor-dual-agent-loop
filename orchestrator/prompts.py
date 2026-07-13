@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from auto.orchestrator.config import BUILTIN_DIR, LoopConfig
+
 
 def read_guidelines(path: Path) -> str:
     if path.exists():
@@ -17,25 +19,25 @@ def build_developer_prompt(
     developer_guidelines: str,
     *,
     owner_reply: str | None = None,
+    safety_guidelines: str = "",
 ) -> str:
     owner_block = ""
     if owner_reply:
         owner_block = f"\nOwner clarification (treat as authoritative):\n{owner_reply}\n"
+    safety_block = f"\nSafety guidelines:\n{safety_guidelines}\n" if safety_guidelines else ""
     return f"""
 You are the Developer Agent.
 
-Use these project guidelines:
+Built-in protocol:
 {developer_guidelines}
-
-Original task:
+{safety_block}
+Owner task:
 {task}
 {owner_block}
 Master instruction:
 {instruction}
 
-Follow .cursor/agents/developer.md.
-
-Perform one coherent implementation step, verify it, and stop with STATUS, CHANGES, VERIFICATION, and NEXT.
+Perform one coherent step, verify it when practical, and stop with STATUS, CHANGES, VERIFICATION, and NEXT.
 """.strip()
 
 
@@ -46,14 +48,28 @@ def build_master_prompt(
     repo_state: str,
     current_iteration: int,
     max_iterations: int,
+    *,
+    master_protocol: str = "",
+    escalate_policy: str = "",
+    safety_guidelines: str = "",
 ) -> str:
+    protocol = master_protocol or read_guidelines(BUILTIN_DIR / "master_protocol.md")
     return f"""
 You are the Master Agent.
 
-Use these project guidelines:
+Built-in protocol:
+{protocol}
+
+Escalate policy:
+{escalate_policy}
+
+Safety guidelines:
+{safety_guidelines}
+
+Owner-provided master instructions (context / operating knowledge):
 {master_guidelines}
 
-Original task:
+Owner task (derive the plan, checks, and completion criteria from this):
 {task}
 
 Current iteration:
@@ -62,15 +78,25 @@ Current iteration:
 Developer output:
 {developer_output}
 
-Repository state:
+Repository / workspace state (inspect further yourself when needed):
 {repo_state}
-
-Follow .cursor/agents/master.md.
 
 Return DECISION, INSTRUCTION_FOR_DEVELOPER, REASON, and CHECKS_REQUIRED.
 
 Important:
-- Return STOP only if the task is complete and verification is acceptable.
-- Return ESCALATE only if a real human decision is required.
-- Otherwise return CONTINUE or FIX with the exact next instruction for the developer.
+- Inspect artifacts when claims matter; do not trust developer prose alone.
+- Return STOP only if the task is complete by your derived criteria.
+- Return ESCALATE only when the escalate policy applies.
+- Otherwise return CONTINUE or FIX with the exact next developer instruction.
+- Your reply MUST include a line: DECISION: CONTINUE|FIX|STOP|ESCALATE
 """.strip()
+
+
+def build_prompts_for_config(config: LoopConfig) -> tuple[str, str, str, str]:
+    """Return (master_protocol, developer_protocol, escalate, safety)."""
+    return (
+        read_guidelines(BUILTIN_DIR / "master_protocol.md"),
+        read_guidelines(BUILTIN_DIR / "developer_protocol.md"),
+        read_guidelines(config.escalate_policy),
+        read_guidelines(config.safety_guidelines),
+    )

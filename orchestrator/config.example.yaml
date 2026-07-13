@@ -1,64 +1,35 @@
-# Dual-agent loop configuration example.
-# Copy to auto/runs/<task-id>/config.yaml and adjust.
+# Minimal dual-agent loop config
+# Required: workspace, model, max_iterations, master_instructions, task
 
-task_id: hello-sandbox
-
-# Task description (or path to brief.md)
-task: |
-  Create auto/sandbox/hello.py with a greet(name) function returning "Hello, {name}!".
-  Add auto/sandbox/test_hello.py with pytest tests. Run pytest on the sandbox tests.
-
-# Optional: path to brief.md (overrides task if set)
-# brief_file: auto/runs/hello-sandbox/brief.md
-
-repo_root: .
-
-# Sandbox directory relative to repo_root
-sandbox_dir: auto/sandbox
-
-# Mode: greenfield (cwd=sandbox) or constrained (cwd=repo_root + hooks allowlist)
-workspace_mode: constrained
-
-# Extra paths the developer may edit (relative to repo_root)
-allowed_paths: []
-
-# Guidelines files (relative to repo_root)
-master_guidelines: auto/guidelines/master.md
-developer_guidelines: auto/guidelines/developer.md
-
-# Agent model
-model: composer-2.5
-
-# Backend: sdk (default) or cli
+task_id: my-task
+workspace: .
+model: auto
+max_iterations: 40
 backend: sdk
 
-# Verification commands (optional)
-test_command: "PYTHONPATH=. pytest auto/sandbox/test_hello.py -q"
-lint_command: null
+# Default: agents may write anywhere under workspace
+write_roots:
+  - .
 
-# Loop limits
-max_iterations: 8
-max_consecutive_fixes: 3
+# off (default): no hard shell denylist; soft safety lives in safety_guidelines
+# soft: same as off for hooks
+# strict: enable hard denylist (git push, rm -rf /, DROP TABLE, ...)
+safety_mode: "off"
+safety_guidelines: default   # or path to a markdown file
+escalate_policy: default     # or path to a markdown file
 
-# Initial instruction for first developer turn
+# File 1: master context / how the master should think
+master_instructions: auto/runs/my-task/instruction_for_master
+
+# File 2: task the master uses to drive the developer (path or inline text)
+task: auto/runs/my-task/instruction_for_master_to_guide_developer
+
 initial_instruction: |
-  Start the task. Inspect the codebase, identify the first implementation step,
-  make the smallest useful change, verify it, and stop.
+  Start with the first coherent step for this task.
 
-# Owner reply injected on resume after ESCALATE (set before --resume)
-# owner_reply: |
-#   Use greet() without punctuation in the greeting.
+owner_reply: null
+run_dir: null   # default: auto/runs/<task_id>
 
-# Notification settings
 notify:
   write_needs_owner: true
   webhook_url: null
-
-# Run directory (auto-created under auto/runs/<task_id>/ if not set)
-run_dir: null
-
-# Resume state (populated by orchestrator)
-developer_agent_id: null
-master_agent_id: null
-last_iteration: 0
-last_instruction: null
