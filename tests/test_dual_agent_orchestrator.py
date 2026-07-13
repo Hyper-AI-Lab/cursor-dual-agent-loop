@@ -169,3 +169,34 @@ def test_notify_invalid_decision(tmp_path: Path):
     )
     assert path is not None
     assert path.name == "NEEDS_OWNER.md"
+
+
+def test_master_bootstrap_prompts():
+    from auto.orchestrator.prompts import (
+        build_master_context_prompt,
+        build_master_task_bootstrap_prompt,
+    )
+
+    ctx = build_master_context_prompt("Know the repo.", safety_guidelines="Be safe.")
+    assert "bootstrap step 1" in ctx.lower() or "Bootstrap step 1" in ctx
+    assert "READY: yes" in ctx
+    assert "Know the repo." in ctx
+    assert "DECISION:" not in ctx.split("Do not output")[0] or "Do not output DECISION" in ctx
+
+    task = build_master_task_bootstrap_prompt(
+        "Explore Phase 0.",
+        master_protocol="proto",
+        escalate_policy="esc",
+        safety_guidelines="safe",
+        max_iterations=10,
+    )
+    assert "bootstrap step 2" in task.lower() or "Bootstrap step 2" in task
+    assert "Explore Phase 0." in task
+    assert "DECISION: CONTINUE|FIX|STOP|ESCALATE" in task
+
+
+def test_master_ready_helper():
+    from auto.orchestrator.dual_agent_loop import _master_ready
+
+    assert _master_ready("READY: yes\nSUMMARY:\n- a\n- b")
+    assert not _master_ready("nope")

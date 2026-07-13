@@ -24,7 +24,9 @@ from auto.orchestrator.notify import notify_owner
 from auto.orchestrator.parse import extract_decision, extract_instruction
 from auto.orchestrator.prompts import (
     build_developer_prompt,
+    build_master_context_prompt,
     build_master_prompt,
+    build_master_task_bootstrap_prompt,
     build_prompts_for_config,
     read_guidelines,
 )
@@ -52,81 +54,14 @@ def append_log(path: Path, title: str, body: str) -> None:
 
 
 def _prompt_parts(config):
-    protocol, developer_protocol, escalate, safety = build_prompts_for_config(config)
-    return protocol, developer_protocol, escalate, safety
+    return build_prompts_for_config(config)
 
 
-def run_cli_iteration(config, iteration: int, instruction: str, *, force_dev: bool) -> str:
-    _protocol, developer_protocol, escalate, safety = _prompt_parts(config)
-    dev_prompt = build_developer_prompt(
-        config.task,
-        instruction,
-        developer_protocol,
-        owner_reply=config.owner_reply if iteration == config.last_iteration + 1 else None,
-        safety_guidelines=safety,
-    )
-    dev_output = call_agent_cli(
-        dev_prompt,
-        cwd=config.developer_cwd,
-        model=config.model,
-        force=force_dev,
-    )
-    append_log(config.run_dir / "developer.log", f"ITERATION {iteration}", dev_output)
-
-    repo_state = collect_repo_state(config)
-    write_state_snapshot(config.run_dir, iteration, repo_state)
-
-    master_prompt = build_master_prompt(
-        config.task,
-        read_guidelines(config.master_instructions),
-        dev_output,
-        repo_state,
-        iteration,
-        config.max_iterations,
-        master_protocol=_protocol,
-        escalate_policy=escalate,
-        safety_guidelines=safety,
-    )
-    master_output = call_agent_cli(
-        master_prompt,
-        cwd=config.workspace,
-        model=config.model,
-        force=False,
-        mode="plan",
-    )
-    append_log(config.run_dir / "master.log", f"ITERATION {iteration}", master_output)
-    return master_output
-
-
-async def run_sdk_iteration(agents, config, iteration: int, instruction: str) -> str:
-    _protocol, developer_protocol, escalate, safety = _prompt_parts(config)
-    dev_prompt = build_developer_prompt(
-        config.task,
-        instruction,
-        developer_protocol,
-        owner_reply=config.owner_reply if iteration == config.last_iteration + 1 else None,
-        safety_guidelines=safety,
-    )
-    dev_output = await send_developer(agents, dev_prompt)
-    append_log(config.run_dir / "developer.log", f"ITERATION {iteration}", dev_output)
-
-    repo_state = collect_repo_state(config)
-    write_state_snapshot(config.run_dir, iteration, repo_state)
-
-    master_prompt = build_master_prompt(
-        config.task,
-        read_guidelines(config.master_instructions),
-        dev_output,
-        repo_state,
-        iteration,
-        config.max_iterations,
-        master_protocol=_protocol,
-        escalate_policy=escalate,
-        safety_guidelines=safety,
-    )
-    master_output = await send_master(agents, master_prompt)
-    append_log(config.run_dir / "master.log", f"ITERATION {iteration}", master_output)
-    return master_output
+def _master_ready(text: str) -> bool:
+    upper = (text or "").upper()
+    if "READY:" in upper and "YES" in upper:
+        return True
+    return len((text or "").strip()) >= 40 and "NOT READY" not in upper
 
 
 def _handle_decision(
@@ -180,22 +115,185 @@ def _handle_decision(
         )
         return 0, True
 
-    # CONTINUE or FIX — keep looping
     return None, False
+
+
+def _persist_agent_ids(config, agents) -> None:
+    if agents is None:
+        return
+    config.developer_agent_id = agents.developer.agent_id
+    config.master_agent_id = agents.master.agent_id
+    if config.config_path:
+        save_config(config)
+
+
+def _cli_master_text(config, prompt: str) -> str:
+    return call_agent_cli(
+        prompt,
+        cwd=config.workspace,
+        model=config.model,
+        force=False,
+        mode="plan",
+    )
+
+
+async def bootstrap_master(config, agents) -> tuple[str | None, int | None]:
+    """Master-first bootstrap: File 1 context, then File 2 -> first developer instruction.
+
+    Returns (instruction_for_developer, exit_code_if_stopped).
+    """
+    protocol, _dev_protocol, escalate, safety = _prompt_parts(config)
+    master_instructions = read_guidelines(config.master_instructions)
+
+    print("\n=== BOOTSTRAP 1/2: master context ===")
+    context_prompt = build_master_context_prompt(
+        master_instructions,
+        safety_guidelines=safety,
+    )
+    if agents is not None:
+        context_out = await send_master(agents, context_prompt)
+    else:
+        context_out = _cli_master_text(config, context_prompt)
+    append_log(config.run_dir / "master.log", "BOOTSTRAP 1/2 CONTEXT", context_out)
+    _persist_agent_ids(config, agents)
+
+    if not _master_ready(context_out):
+        notify_owner(
+            config.run_dir,
+            "invalid_decision",
+            "Master bootstrap context step failed (no READY acknowledgment).\n\n"
+            + context_out,
+            write_needs_owner=config.notify.write_needs_owner,
+            webhook_url=config.notify.webhook_url,
+            task_id=config.task_id,
+        )
+        return None, 1
+
+    print("\n=== BOOTSTRAP 2/2: master task -> first developer instruction ===")
+    task_prompt = build_master_task_bootstrap_prompt(
+        config.task,
+        master_protocol=protocol,
+        escalate_policy=escalate,
+        safety_guidelines=safety,
+        max_iterations=config.max_iterations,
+    )
+    if agents is not None:
+        task_out = await send_master(agents, task_prompt)
+    else:
+        task_out = _cli_master_text(config, task_prompt)
+    append_log(config.run_dir / "master.log", "BOOTSTRAP 2/2 TASK", task_out)
+    _persist_agent_ids(config, agents)
+
+    decision = extract_decision(task_out)
+    instruction = extract_instruction(task_out)
+    config.last_instruction = instruction
+    if config.config_path:
+        save_config(config)
+
+    print(f"Bootstrap decision: {decision or 'INVALID'}")
+    print(instruction)
+
+    if decision is None:
+        notify_owner(
+            config.run_dir,
+            "invalid_decision",
+            "Master bootstrap task step missing DECISION.\n\n" + task_out,
+            write_needs_owner=config.notify.write_needs_owner,
+            webhook_url=config.notify.webhook_url,
+            task_id=config.task_id,
+        )
+        return None, 1
+
+    if decision == "STOP":
+        notify_owner(
+            config.run_dir,
+            "complete",
+            task_out,
+            write_needs_owner=config.notify.write_needs_owner,
+            webhook_url=config.notify.webhook_url,
+            task_id=config.task_id,
+        )
+        return None, 0
+
+    if decision == "ESCALATE":
+        notify_owner(
+            config.run_dir,
+            "needs_input",
+            task_out,
+            write_needs_owner=config.notify.write_needs_owner,
+            webhook_url=config.notify.webhook_url,
+            task_id=config.task_id,
+        )
+        return None, 0
+
+    return instruction, None
+
+
+async def run_developer_turn(
+    config, agents, iteration: int, instruction: str, *, force_dev: bool
+) -> str:
+    _protocol, developer_protocol, _escalate, safety = _prompt_parts(config)
+    inject_owner = None
+    if config.owner_reply:
+        inject_owner = config.owner_reply
+        config.owner_reply = None
+        if config.config_path:
+            save_config(config)
+
+    # Also allow owner clarification embedded in instruction from resume path
+    dev_prompt = build_developer_prompt(
+        config.task,
+        instruction,
+        developer_protocol,
+        owner_reply=inject_owner,
+        safety_guidelines=safety,
+    )
+    if agents is not None:
+        dev_output = await send_developer(agents, dev_prompt)
+    else:
+        dev_output = call_agent_cli(
+            dev_prompt,
+            cwd=config.developer_cwd,
+            model=config.model,
+            force=force_dev,
+        )
+    append_log(config.run_dir / "developer.log", f"ITERATION {iteration}", dev_output)
+    _persist_agent_ids(config, agents)
+    return dev_output
+
+
+async def run_master_review_turn(
+    config, agents, iteration: int, developer_output: str
+) -> str:
+    protocol, _dev, escalate, safety = _prompt_parts(config)
+    repo_state = collect_repo_state(config)
+    write_state_snapshot(config.run_dir, iteration, repo_state)
+
+    master_prompt = build_master_prompt(
+        config.task,
+        read_guidelines(config.master_instructions),
+        developer_output,
+        repo_state,
+        iteration,
+        config.max_iterations,
+        master_protocol=protocol,
+        escalate_policy=escalate,
+        safety_guidelines=safety,
+    )
+    if agents is not None:
+        master_output = await send_master(agents, master_prompt)
+    else:
+        master_output = _cli_master_text(config, master_prompt)
+    append_log(config.run_dir / "master.log", f"ITERATION {iteration}", master_output)
+    _persist_agent_ids(config, agents)
+    return master_output
 
 
 async def run_loop_async(config, *, resume: bool, force_dev: bool) -> int:
     config.run_dir.mkdir(parents=True, exist_ok=True)
     sync_allowlist(config)
 
-    start = config.last_iteration + 1 if resume else 1
-    instruction = config.last_instruction or config.initial_instruction
-    if resume and config.owner_reply:
-        instruction = f"{instruction}\n\nOwner clarification:\n{config.owner_reply}"
-        config.owner_reply = None
-
     agents = None
-
     try:
         if config.backend == "sdk":
             agents = await create_sdk_agents(
@@ -206,24 +304,29 @@ async def run_loop_async(config, *, resume: bool, force_dev: bool) -> int:
                 master_agent_id=config.master_agent_id if resume else None,
             )
 
-        for iteration in range(start, config.max_iterations + 1):
-            if config.backend == "sdk":
-                assert agents is not None
-                master_output = await run_sdk_iteration(agents, config, iteration, instruction)
-            else:
-                master_output = run_cli_iteration(config, iteration, instruction, force_dev=force_dev)
+        if resume and config.last_iteration > 0 and config.last_instruction:
+            start = config.last_iteration + 1
+            instruction = config.last_instruction
+            # owner_reply (if any) is injected once in run_developer_turn
+        else:
+            instruction, boot_exit = await bootstrap_master(config, agents)
+            if boot_exit is not None:
+                return boot_exit
+            assert instruction is not None
+            start = 1
 
+        for iteration in range(start, config.max_iterations + 1):
+            dev_output = await run_developer_turn(
+                config, agents, iteration, instruction, force_dev=force_dev
+            )
+            master_output = await run_master_review_turn(
+                config, agents, iteration, dev_output
+            )
             decision = extract_decision(master_output)
             instruction = extract_instruction(master_output)
-
             exit_code, stop = _handle_decision(
                 config, iteration, decision, instruction, master_output
             )
-            if agents is not None:
-                config.developer_agent_id = agents.developer.agent_id
-                config.master_agent_id = agents.master.agent_id
-                if config.config_path:
-                    save_config(config)
             if stop:
                 return exit_code if exit_code is not None else 0
 
@@ -247,42 +350,8 @@ async def run_loop_async(config, *, resume: bool, force_dev: bool) -> int:
                 save_config(config)
 
 
-async def _run_cli_loop(config, *, resume: bool, force_dev: bool) -> int:
-    config.run_dir.mkdir(parents=True, exist_ok=True)
-    sync_allowlist(config)
-
-    start = config.last_iteration + 1 if resume else 1
-    instruction = config.last_instruction or config.initial_instruction
-    if resume and config.owner_reply:
-        instruction = f"{instruction}\n\nOwner clarification:\n{config.owner_reply}"
-        config.owner_reply = None
-
-    for iteration in range(start, config.max_iterations + 1):
-        master_output = run_cli_iteration(config, iteration, instruction, force_dev=force_dev)
-        decision = extract_decision(master_output)
-        instruction = extract_instruction(master_output)
-        exit_code, stop = _handle_decision(
-            config, iteration, decision, instruction, master_output
-        )
-        if stop:
-            return exit_code if exit_code is not None else 0
-
-    print("\nMaximum iterations reached. Review logs in", config.run_dir)
-    notify_owner(
-        config.run_dir,
-        "max_iterations",
-        "Loop reached max_iterations without STOP.",
-        write_needs_owner=config.notify.write_needs_owner,
-        webhook_url=config.notify.webhook_url,
-        task_id=config.task_id,
-    )
-    return 1
-
-
 def run_loop(config, *, resume: bool, force_dev: bool) -> int:
-    if config.backend == "sdk":
-        return asyncio.run(run_loop_async(config, resume=resume, force_dev=force_dev))
-    return asyncio.run(_run_cli_loop(config, resume=resume, force_dev=force_dev))
+    return asyncio.run(run_loop_async(config, resume=resume, force_dev=force_dev))
 
 
 def main() -> int:

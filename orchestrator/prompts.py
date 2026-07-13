@@ -31,13 +31,81 @@ You are the Developer Agent.
 Built-in protocol:
 {developer_guidelines}
 {safety_block}
-Owner task:
+Owner task (for context; follow the master instruction for this turn):
 {task}
 {owner_block}
 Master instruction:
 {instruction}
 
 Perform one coherent step, verify it when practical, and stop with STATUS, CHANGES, VERIFICATION, and NEXT.
+""".strip()
+
+
+def build_master_context_prompt(
+    master_instructions: str,
+    *,
+    safety_guidelines: str = "",
+) -> str:
+    """Bootstrap step 1: load File 1 (master context) before any task/developer work."""
+    return f"""
+You are the Master Agent. This is bootstrap step 1 of 2 (context only).
+
+Read and internalize the owner-provided master instructions below. Do not plan the full
+project yet and do not invent developer work. Absorb operating context only.
+
+Safety guidelines:
+{safety_guidelines}
+
+Owner-provided master instructions:
+{master_instructions}
+
+When finished, reply with exactly:
+
+READY: yes
+SUMMARY:
+<3-8 bullet points of what you will keep in mind while supervising>
+
+Do not output DECISION yet. Do not instruct the developer yet.
+""".strip()
+
+
+def build_master_task_bootstrap_prompt(
+    task: str,
+    *,
+    master_protocol: str = "",
+    escalate_policy: str = "",
+    safety_guidelines: str = "",
+    max_iterations: int = 40,
+) -> str:
+    """Bootstrap step 2: File 2 (task) → first developer instruction."""
+    protocol = master_protocol or read_guidelines(BUILTIN_DIR / "master_protocol.md")
+    return f"""
+You are the Master Agent. This is bootstrap step 2 of 2 (task → first developer prompt).
+
+You already received master context in the previous message. Now read the owner task below,
+derive the plan, acceptance/finish criteria, and the first concrete developer instruction.
+
+Built-in protocol:
+{protocol}
+
+Escalate policy:
+{escalate_policy}
+
+Safety guidelines:
+{safety_guidelines}
+
+Owner task (goals / targets / how to drive the developer):
+{task}
+
+Loop budget: up to {max_iterations} developer-master iterations after this bootstrap.
+
+Return DECISION, INSTRUCTION_FOR_DEVELOPER, REASON, and CHECKS_REQUIRED.
+
+Important:
+- Prefer DECISION: CONTINUE with the first developer step, unless escalate policy applies.
+- Do not return STOP unless the task is already complete with no work needed.
+- INSTRUCTION_FOR_DEVELOPER must be the exact prompt the developer should execute next.
+- Your reply MUST include a line: DECISION: CONTINUE|FIX|STOP|ESCALATE
 """.strip()
 
 

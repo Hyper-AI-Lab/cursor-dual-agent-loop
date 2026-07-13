@@ -43,6 +43,12 @@ master_instructions: auto/runs/explore_1/instruction_for_master
 task: auto/runs/explore_1/instruction_for_master_to_guide_developer
 ```
 
+## Loop sequence
+
+1. **Bootstrap 1** — Master reads `master_instructions` (File 1), replies `READY`
+2. **Bootstrap 2** — Master reads `task` (File 2), returns first `DECISION` + `INSTRUCTION_FOR_DEVELOPER`
+3. **Loop** — Developer runs that instruction → Master reviews → next instruction, until STOP / ESCALATE / max_iterations / invalid DECISION
+
 ## Launch
 
 ```bash

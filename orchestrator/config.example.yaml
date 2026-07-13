@@ -24,8 +24,6 @@ master_instructions: auto/runs/my-task/instruction_for_master
 # File 2: task the master uses to drive the developer (path or inline text)
 task: auto/runs/my-task/instruction_for_master_to_guide_developer
 
-initial_instruction: |
-  Start with the first coherent step for this task.
 
 owner_reply: null
 run_dir: null   # default: auto/runs/<task_id>

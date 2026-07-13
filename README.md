@@ -27,6 +27,12 @@ Optional: `write_roots` (default whole workspace), `safety_mode` (`"off"` defaul
 Built-in (not user homework): DECISION protocol, escalate policy, soft safety guidelines.
 Force-stop anytime with `Ctrl+C`.
 
+## Loop sequence
+
+1. **Bootstrap 1** — Master reads `master_instructions` (File 1), replies `READY`
+2. **Bootstrap 2** — Master reads `task` (File 2), returns first `DECISION` + `INSTRUCTION_FOR_DEVELOPER`
+3. **Loop** — Developer → Master review → next instruction, until STOP / ESCALATE / max_iterations
+
 ## Smoke test (recommended first run)
 
 See **[examples/hello-sandbox/README.md](examples/hello-sandbox/README.md)**.
