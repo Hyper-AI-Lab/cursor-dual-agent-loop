@@ -125,7 +125,7 @@ python auto/orchestrator/dual_agent_loop.py \
   --backend sdk
 ```
 
-Full walkthrough: **[examples/hello-sandbox/README.md](examples/hello-sandbox/README.md)**  
+Full walkthrough: **[examples/hello-sandbox/README.md](examples/hello-sandbox/README.md)** (config + `instruction_for_master` + task instruction file).  
 Architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**  
 Problem / design notes: **[docs/WHY.md](docs/WHY.md)**
 
@@ -139,12 +139,15 @@ Two files + a few settings:
 task_id: my-task
 workspace: .
 model: auto
-max_iterations: 40          # hard stop for the orchestrator only
+# developer_model: auto
+# master_model: composer-2.5
+max_iterations: 40
 backend: sdk
-write_roots: ["."]          # narrow this for safer runs
+write_roots: ["."]
 safety_mode: "off"
-master_instructions: path/to/instruction_for_master.md
-task: path/to/task.md
+master_instructions: auto/runs/my-task/instruction_for_master
+task: auto/runs/my-task/instruction_for_master_to_guide_developer
+run_dir: auto/runs/my-task
 ```
 
 | Field | Meaning |

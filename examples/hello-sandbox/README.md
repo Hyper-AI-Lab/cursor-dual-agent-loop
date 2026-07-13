@@ -4,44 +4,60 @@ Runnable end-to-end check that the dual-agent loop works on your machine.
 
 **You need:** Cursor account, `CURSOR_API_KEY`, Python 3.10+, `cursor-sdk`, Cursor CLI (`agent`).
 
-## 1. Install into a project
+This example uses the **same config shape** as a real run: `config.yaml` plus two instruction files.
 
-Use any empty or existing git repo as the target:
+| File | Role |
+|------|------|
+| `config.yaml` | workspace, model(s), `max_iterations`, paths, safety |
+| `instruction_for_master` | File 1 — how the master should supervise |
+| `instruction_for_master_to_guide_developer` | File 2 — the task / acceptance criteria |
+
+## 1. Install into a project
 
 ```bash
 git clone https://github.com/Hyper-AI-Lab/cursor-dual-agent-loop.git
 ./cursor-dual-agent-loop/scripts/install-into-repo.sh /path/to/your-project
 ```
 
+The installer copies orchestrator code and, if missing, seeds `auto/runs/hello-sandbox/` with this example’s config + instruction files.
+
 ## 2. Prepare environment
 
 ```bash
 cd /path/to/your-project
 
-# Optional but recommended: isolated Python env
-conda create -n dual-agent python=3.12 -y
+conda create -n dual-agent python=3.12 -y   # optional
 conda activate dual-agent
 
 pip install cursor-sdk pyyaml pytest
 curl https://cursor.com/install -fsS | bash
 export PATH="$HOME/.local/bin:$PATH"
-export CURSOR_API_KEY="cursor_..."   # Cursor Dashboard -> Integrations / API Keys
+export CURSOR_API_KEY="cursor_..."
 
 python auto/orchestrator/verify_prereqs.py
-# Expect: OK: CLI, OK: cursor-sdk, OK: Agent.prompt replied
 ```
 
-## 3. Install smoke-test config
+## 3. Confirm run files
 
 ```bash
-mkdir -p auto/runs/hello-sandbox
-cp /path/to/cursor-dual-agent-loop/examples/hello-sandbox/config.yaml \
-   auto/runs/hello-sandbox/config.yaml
+ls auto/runs/hello-sandbox/
+# config.yaml
+# instruction_for_master
+# instruction_for_master_to_guide_developer
 ```
 
-Or copy from `auto/orchestrator/config.example.yaml` after install (same task).
+If you installed an older copy, refresh from this example:
 
-**Model:** set `model: auto` in config.yaml to use Cursor Auto routing, or pin e.g. `composer-2.5`.
+```bash
+cp /path/to/cursor-dual-agent-loop/examples/hello-sandbox/config.yaml \
+   auto/runs/hello-sandbox/config.yaml
+cp /path/to/cursor-dual-agent-loop/examples/hello-sandbox/instruction_for_master \
+   auto/runs/hello-sandbox/instruction_for_master
+cp /path/to/cursor-dual-agent-loop/examples/hello-sandbox/instruction_for_master_to_guide_developer \
+   auto/runs/hello-sandbox/instruction_for_master_to_guide_developer
+```
+
+Optional: set `developer_model` / `master_model` in `config.yaml` to split cost (cheaper/`auto` developer, stronger master).
 
 ## 4. Run the loop
 
@@ -51,36 +67,32 @@ python auto/orchestrator/dual_agent_loop.py \
   --backend sdk
 ```
 
-### Expected behavior (2 iterations typical)
+### Expected behavior (a few iterations typical)
 
-| Iteration | Master decision | What happened |
-|-----------|-----------------|---------------|
-| 1 | `FIX` | Developer created `hello.py`; master asks for pytest tests |
-| 2 | `STOP` | Tests added, pytest passed — done |
-
-`FIX` is normal — it means "not finished yet", not a crash.
+| Master decision | Meaning |
+|-----------------|---------|
+| `CONTINUE` / `FIX` | More work needed (FIX is normal, not a crash) |
+| `STOP` | Acceptance criteria met → `COMPLETE.md` |
 
 ## 5. Verify output
 
 ```bash
 ls auto/sandbox/
 PYTHONPATH=. pytest auto/sandbox/test_hello.py -q
-# 2 passed
-
 tail auto/runs/hello-sandbox/master.log
 ```
 
-Compare with reference files in `examples/hello-sandbox/reference/` (expected end state).
+Compare with `examples/hello-sandbox/reference/` (expected end state).
 
-## 6. After the run (your choice)
+## 6. After the run
 
 The loop does **not** commit. For a smoke test you can:
 
-- **Discard** (reset sandbox): `git checkout -- auto/sandbox/ 2>/dev/null; rm -f auto/sandbox/*.py`
-- **Keep** (record success): `git add auto/sandbox/*.py && git commit -m "hello-sandbox smoke test"`
-- On **STOP**, read `auto/runs/hello-sandbox/COMPLETE.md` (summary only; no resume needed)
+- **Discard:** `rm -f auto/sandbox/hello.py auto/sandbox/test_hello.py`
+- **Keep:** `git add auto/sandbox/*.py && git commit -m "hello-sandbox smoke test"`
+- On **STOP**, read `auto/runs/hello-sandbox/COMPLETE.md`
 
-## Run in background (screen)
+## Background (screen)
 
 ```bash
 screen -S dual-agent-hello

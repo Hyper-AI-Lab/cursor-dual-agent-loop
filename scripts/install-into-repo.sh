@@ -19,7 +19,12 @@ for rel in auto/__init__.py auto/guidelines auto/sandbox auto/runs .cursor/agent
 done
 chmod +x "$TARGET/.cursor/hooks/"*.sh 2>/dev/null || true
 mkdir -p "$TARGET/auto/runs/hello-sandbox"
-if [[ ! -f "$TARGET/auto/runs/hello-sandbox/config.yaml" ]]; then
-  cp "$SRC/examples/hello-sandbox/config.yaml" "$TARGET/auto/runs/hello-sandbox/config.yaml"
-fi
+for f in config.yaml instruction_for_master instruction_for_master_to_guide_developer; do
+  if [[ ! -f "$TARGET/auto/runs/hello-sandbox/$f" ]]; then
+    cp "$SRC/examples/hello-sandbox/$f" "$TARGET/auto/runs/hello-sandbox/$f"
+    echo "INSTALLED: auto/runs/hello-sandbox/$f"
+  else
+    echo "SKIP: auto/runs/hello-sandbox/$f"
+  fi
+done
 echo "Install complete."

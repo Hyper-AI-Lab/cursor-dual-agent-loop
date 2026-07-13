@@ -1,24 +1,54 @@
+# Dual-agent run config — hello-sandbox (smoke test)
+
+# =============================================================================
+# Should be configured by the user
+# =============================================================================
+
 task_id: hello-sandbox
+
+# Directory agents work in ("." = the repo you installed into)
 workspace: .
+
+# Shared default when developer_model / master_model are omitted
 model: auto
+
+# Cost tip: stronger/expensive model on master (review), cheaper or auto on developer.
+# Uncomment to split:
+# developer_model: auto
+# master_model: composer-2.5
+
+# Hard stop after this many developer↔master iterations (bootstrap does not count).
+# Enforced only by the orchestrator — never shown to the master as a work budget.
 max_iterations: 8
+
+# File 1 — master context / operating knowledge
+master_instructions: auto/runs/hello-sandbox/instruction_for_master
+
+# File 2 — task / goals (path to file, or inline multiline string)
+task: auto/runs/hello-sandbox/instruction_for_master_to_guide_developer
+
+# =============================================================================
+# Default parameters (safe to leave as-is; override when needed)
+# =============================================================================
+
 backend: sdk
+
+# Smoke test: keep edits inside the sandbox. For real tasks you may use ["."].
 write_roots:
   - auto/sandbox
+
 safety_mode: "off"
 safety_guidelines: default
 escalate_policy: default
-master_instructions: auto/guidelines/master.md
-task: |
-  Create auto/sandbox/hello.py with a greet(name) function returning "Hello, {name}!".
-  Add auto/sandbox/test_hello.py with pytest tests. Run pytest on the sandbox tests.
-initial_instruction: |
-  Start the task. Inspect the codebase, identify the first implementation step,
-  make the smallest useful change, verify it, and stop.
-owner_reply: null
+
 test_command: PYTHONPATH=. pytest auto/sandbox/test_hello.py -q
 lint_command: null
+
+owner_reply: null
+
 notify:
   write_needs_owner: true
   webhook_url: null
+
+# Logs + notifications (+ run_state.yaml for resume IDs / iteration)
 run_dir: auto/runs/hello-sandbox

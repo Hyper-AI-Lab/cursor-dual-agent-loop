@@ -1,0 +1,16 @@
+# Task for the developer (via master)
+
+Goal: implement a tiny hello helper under `auto/sandbox/` with tests.
+
+## Acceptance criteria
+
+1. Create `auto/sandbox/hello.py` with a function `greet(name: str) -> str` that returns `Hello, {name}!`.
+2. Create `auto/sandbox/test_hello.py` with pytest tests covering at least two names.
+3. Running `PYTHONPATH=. pytest auto/sandbox/test_hello.py -q` passes.
+4. Do not edit files outside `auto/sandbox/`.
+
+## How to drive work
+
+- Start with the smallest useful step (e.g. implement `hello.py`, then tests).
+- After implementation, require verification with pytest before `STOP`.
+- If tests are missing or failing, issue `FIX` with a precise instruction.
