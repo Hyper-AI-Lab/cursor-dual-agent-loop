@@ -201,11 +201,11 @@ def load_config(config_path: Path) -> LoopConfig:
         write_roots=write_roots,
         master_instructions=master_instructions,
         task_file=task_file,
-        model=str(raw.get("model", "auto") or "auto"),
+        model=str(raw.get("model", "auto") or "auto").strip(),
         developer_model=str(
             raw.get("developer_model") or raw.get("model") or "auto"
-        ),
-        master_model=str(raw.get("master_model") or raw.get("model") or "auto"),
+        ).strip(),
+        master_model=str(raw.get("master_model") or raw.get("model") or "auto").strip(),
         backend=raw.get("backend", "sdk"),
         max_iterations=int(raw.get("max_iterations", 40)),
         safety_mode=safety_mode,

@@ -67,6 +67,28 @@ async def create_sdk_agents(
     return SdkAgents(client=client, developer=developer, master=master)
 
 
+def _format_run_failure(role: str, result: object) -> str:
+    """Build an actionable error from a failed SDK run result."""
+    run_id = getattr(result, "id", None) or "unknown"
+    status = getattr(result, "status", None)
+    detail = (getattr(result, "result", None) or "").strip()
+    model = getattr(result, "model", None)
+    model_id = getattr(model, "id", None) if model is not None else None
+    parts = [f"{role} run failed: {run_id}"]
+    if status is not None:
+        parts.append(f"status={status}")
+    if model_id:
+        parts.append(f"model={model_id!r}")
+    if detail:
+        parts.append(detail)
+    else:
+        parts.append(
+            "No error detail from SDK. Check model id with: "
+            "python auto/orchestrator/list_models.py"
+        )
+    return " | ".join(parts)
+
+
 async def send_developer(
     agents: SdkAgents, prompt: str, *, mode: str | None = None
 ) -> str:
@@ -77,7 +99,7 @@ async def send_developer(
         run = await agents.developer.send(prompt)
     result = await run.wait()
     if result.status == "error":
-        raise RuntimeError(f"developer run failed: {getattr(result, 'id', 'unknown')}")
+        raise RuntimeError(_format_run_failure("developer", result))
     return (await run.text()).strip()
 
 
@@ -93,7 +115,7 @@ async def send_master(agents: SdkAgents, prompt: str, *, mode: str | None = None
         run = await agents.master.send(prompt)
     result = await run.wait()
     if result.status == "error":
-        raise RuntimeError(f"master run failed: {getattr(result, 'id', 'unknown')}")
+        raise RuntimeError(_format_run_failure("master", result))
     return (await run.text()).strip()
 
 
@@ -119,5 +141,5 @@ def sync_prompt(prompt: str, *, cwd: Path, model: str) -> str:
         ),
     )
     if result.status == "error":
-        raise RuntimeError(f"agent prompt failed: {getattr(result, 'id', 'unknown')}")
+        raise RuntimeError(_format_run_failure("agent", result))
     return (result.result or "").strip()
