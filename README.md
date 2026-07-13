@@ -119,6 +119,7 @@ curl https://cursor.com/install -fsS | bash
 export PATH="$HOME/.local/bin:$PATH"
 
 python auto/orchestrator/verify_prereqs.py
+python auto/orchestrator/list_models.py   # exact model ids for config.yaml
 
 python auto/orchestrator/dual_agent_loop.py \
   --config auto/runs/hello-sandbox/config.yaml \

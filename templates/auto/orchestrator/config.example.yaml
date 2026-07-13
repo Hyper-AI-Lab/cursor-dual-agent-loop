@@ -8,6 +8,7 @@ task_id: my-task
 workspace: .
 
 # Shared default when developer_model / master_model are omitted
+# Exact ids: python auto/orchestrator/list_models.py
 model: auto
 
 # Cost tip: put a stronger (often more expensive) model on the master for review
