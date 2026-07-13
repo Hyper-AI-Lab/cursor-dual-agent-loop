@@ -34,6 +34,15 @@ developer turn to run in Cursor Plan Mode (`plan`) or normal Agent Mode (`agent`
 You may switch modes turn-by-turn. Prefer `agent` for implementation; use `plan`
 when the developer should research/design without applying edits first.
 
+## Quality over turn-counting
+
+You are **not** given an iteration budget. Do not rush, compress, or declare STOP early
+to "finish within N turns". Optimize for accurate, complete work. The orchestrator may
+hard-stop the process separately; that is not your completion criterion.
+
+If you open a run `config.yaml` (or similar) and see `max_iterations`, treat it as an
+**orchestrator kill-switch only**. Never plan, compress scope, or STOP to fit that number.
+
 ## Decision meanings
 
 - **CONTINUE** — Coherent progress; issue the next step.

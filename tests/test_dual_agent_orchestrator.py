@@ -102,9 +102,14 @@ def test_load_minimal_config_and_save(tmp_path: Path):
     assert config.safety_mode == "off"
     assert "max_consecutive_fixes" not in config.__dataclass_fields__
     config.last_iteration = 2
+    config.developer_agent_id = "agent-test"
     save_config(config)
+    assert (config.run_dir / "run_state.yaml").exists()
+    # Owner config.yaml must not be clobbered
+    assert "task_id: t1" in cfg_file.read_text(encoding="utf-8")
     reloaded = load_config(cfg_file)
     assert reloaded.last_iteration == 2
+    assert reloaded.developer_agent_id == "agent-test"
     assert reloaded.task == "do the thing"
 
 
@@ -188,7 +193,6 @@ def test_master_bootstrap_prompts():
         master_protocol="proto",
         escalate_policy="esc",
         safety_guidelines="safe",
-        max_iterations=10,
     )
     assert "bootstrap step 2" in task.lower() or "Bootstrap step 2" in task
     assert "Explore Phase 0." in task
@@ -212,3 +216,28 @@ Do research only.
     assert extract_developer_mode(text) == "plan"
     assert extract_instruction(text) == "Do research only."
     assert extract_developer_mode("DECISION: CONTINUE\nNo mode here") is None
+
+
+def test_master_prompts_omit_iteration_budget():
+    from auto.orchestrator.prompts import (
+        build_master_prompt,
+        build_master_task_bootstrap_prompt,
+    )
+
+    boot = build_master_task_bootstrap_prompt("Do the work.")
+    assert "Loop budget" not in boot
+    assert "up to {" not in boot
+    assert "Do **not** compress" in boot
+
+    review = build_master_prompt(
+        "Do the work.",
+        "master ctx",
+        "developer said done",
+        "git clean",
+    )
+    assert "Current iteration" not in review
+    assert "Loop budget" not in review
+    assert "not be told an iteration cap" in review
+    assert "fit a budget" in review
+    # Protocol may name the config key only to tell the master to ignore it
+    assert "kill-switch" in review or "orchestrator" in review.lower()

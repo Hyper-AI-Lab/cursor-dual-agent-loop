@@ -75,7 +75,6 @@ def build_master_task_bootstrap_prompt(
     master_protocol: str = "",
     escalate_policy: str = "",
     safety_guidelines: str = "",
-    max_iterations: int = 40,
 ) -> str:
     """Bootstrap step 2: File 2 (task) → first developer instruction."""
     protocol = master_protocol or read_guidelines(BUILTIN_DIR / "master_protocol.md")
@@ -97,11 +96,15 @@ Safety guidelines:
 Owner task (goals / targets / how to drive the developer):
 {task}
 
-Loop budget: up to {max_iterations} developer-master iterations after this bootstrap.
+Plan for quality and correctness. Do **not** compress or rush work to fit an iteration
+budget — the orchestrator enforces any hard stop separately; you must not treat a turn
+limit as a completion criterion.
 
 Your entire reply MUST be exactly these sections (no other preamble or status text):
 
 DECISION: CONTINUE
+
+DEVELOPER_MODE: agent
 
 INSTRUCTION_FOR_DEVELOPER:
 <exact first prompt for the developer>
@@ -124,8 +127,6 @@ def build_master_prompt(
     master_guidelines: str,
     developer_output: str,
     repo_state: str,
-    current_iteration: int,
-    max_iterations: int,
     *,
     master_protocol: str = "",
     escalate_policy: str = "",
@@ -150,9 +151,6 @@ Owner-provided master instructions (context / operating knowledge):
 Owner task (derive the plan, checks, and completion criteria from this):
 {task}
 
-Current iteration:
-{current_iteration} of {max_iterations}
-
 Developer output:
 {developer_output}
 
@@ -160,15 +158,18 @@ Repository / workspace state (inspect further yourself when needed):
 {repo_state}
 
 Return DECISION, INSTRUCTION_FOR_DEVELOPER, REASON, and CHECKS_REQUIRED.
+Optionally include DEVELOPER_MODE: agent|plan.
 
 Important:
+- Optimize for productivity, efficiency, and accuracy — not for finishing in fewer turns.
+- Do **not** STOP early to "fit a budget". STOP only when the owner task is truly complete
+  by your derived quality criteria. If more honest work remains, CONTINUE or FIX.
+- You will not be told an iteration cap; ignore any urge to compress scope for turn limits.
 - Inspect artifacts when claims matter; do not trust developer prose alone.
 - If the developer asked a multiple-choice / Needs decision question, answer it in
   INSTRUCTION_FOR_DEVELOPER (or ESCALATE to the owner when required).
 - Optionally set DEVELOPER_MODE: agent|plan for the next developer turn (default agent).
-- Return STOP only if the task is complete by your derived criteria.
 - Return ESCALATE only when the escalate policy applies.
-- Otherwise return CONTINUE or FIX with the exact next developer instruction.
 - Your reply MUST include a line: DECISION: CONTINUE|FIX|STOP|ESCALATE
 """.strip()
 

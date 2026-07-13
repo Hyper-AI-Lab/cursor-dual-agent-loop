@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import hashlib
 import yaml
 
 BUILTIN_DIR = Path(__file__).resolve().parent / "builtin"
@@ -191,7 +192,7 @@ def load_config(config_path: Path) -> LoopConfig:
         webhook_url=notify_raw.get("webhook_url"),
     )
 
-    return LoopConfig(
+    config = LoopConfig(
         task_id=task_id,
         task=task_text,
         workspace=workspace,
@@ -218,51 +219,80 @@ def load_config(config_path: Path) -> LoopConfig:
         last_developer_mode=(raw.get("last_developer_mode") or None),
         config_path=config_path.resolve(),
     )
+    # Overlay durable runtime/resume state (does not rewrite owner config.yaml).
+    state = load_runtime_state(run_dir)
+    if state.get("developer_agent_id"):
+        config.developer_agent_id = state.get("developer_agent_id")
+    if state.get("master_agent_id"):
+        config.master_agent_id = state.get("master_agent_id")
+    if state.get("last_iteration") is not None:
+        config.last_iteration = int(state.get("last_iteration") or 0)
+    if "last_instruction" in state:
+        config.last_instruction = state.get("last_instruction")
+    if "last_developer_mode" in state:
+        config.last_developer_mode = state.get("last_developer_mode")
+    config.consumed_owner_reply_hash = state.get("consumed_owner_reply_hash")
+    # If this owner_reply was already applied on a prior resume, do not re-inject.
+    if config.owner_reply and config.consumed_owner_reply_hash == _owner_reply_hash(config.owner_reply):
+        config.owner_reply = None
+    return config
 
 
-def save_config(config: LoopConfig) -> None:
-    if not config.config_path:
-        raise ValueError("config_path is required to save")
 
-    data: dict[str, Any] = {
-        "task_id": config.task_id,
-        "workspace": ".",
-        "model": config.model,
-        "max_iterations": config.max_iterations,
-        "backend": config.backend,
-        "write_roots": config.write_roots,
-        "safety_mode": config.safety_mode,
-        "safety_guidelines": (
-            "default"
-            if config.safety_guidelines.parent == BUILTIN_DIR
-            else _as_rel(config.workspace, config.safety_guidelines)
-        ),
-        "escalate_policy": (
-            "default"
-            if config.escalate_policy.parent == BUILTIN_DIR
-            else _as_rel(config.workspace, config.escalate_policy)
-        ),
-        "master_instructions": _as_rel(config.workspace, config.master_instructions),
-        "initial_instruction": config.initial_instruction,
-        "owner_reply": config.owner_reply,
-        "test_command": config.test_command,
-        "lint_command": config.lint_command,
-        "notify": {
-            "write_needs_owner": config.notify.write_needs_owner,
-            "webhook_url": config.notify.webhook_url,
-        },
-        "run_dir": _as_rel(config.workspace, config.run_dir),
+
+RUNTIME_STATE_KEYS = (
+    "developer_agent_id",
+    "master_agent_id",
+    "last_iteration",
+    "last_instruction",
+    "last_developer_mode",
+    "consumed_owner_reply_hash",
+)
+
+
+def _owner_reply_hash(text: str | None) -> str | None:
+    if not text:
+        return None
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:24]
+
+
+def runtime_state_path(config: "LoopConfig") -> Path:
+    return config.run_dir / "run_state.yaml"
+
+
+def load_runtime_state(run_dir: Path) -> dict[str, Any]:
+    path = run_dir / "run_state.yaml"
+    if not path.exists():
+        return {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def save_runtime_state(config: "LoopConfig") -> None:
+    """Persist resume fields without rewriting the owner-edited config.yaml."""
+    config.run_dir.mkdir(parents=True, exist_ok=True)
+    data = {
         "developer_agent_id": config.developer_agent_id,
         "master_agent_id": config.master_agent_id,
         "last_iteration": config.last_iteration,
         "last_instruction": config.last_instruction,
         "last_developer_mode": config.last_developer_mode,
+        "consumed_owner_reply_hash": getattr(config, "consumed_owner_reply_hash", None),
     }
-    if config.task_file and config.task_file.exists():
-        data["task"] = _as_rel(config.workspace, config.task_file)
-    else:
-        data["task"] = config.task
-    config.config_path.write_text(
+    runtime_state_path(config).write_text(
         yaml.dump(data, default_flow_style=False, sort_keys=False),
         encoding="utf-8",
     )
+
+
+def save_config(config: LoopConfig) -> None:
+    """Backward-compatible name: only writes run_state.yaml (never clobbers config.yaml)."""
+    if not config.config_path:
+        raise ValueError("config_path is required to save")
+    save_runtime_state(config)
+
+
+def mark_owner_reply_consumed(config: LoopConfig, reply: str) -> None:
+    config.consumed_owner_reply_hash = _owner_reply_hash(reply)
+    config.owner_reply = None
+    save_runtime_state(config)

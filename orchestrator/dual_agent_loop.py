@@ -19,7 +19,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from auto.orchestrator.cli_backend import call_agent_cli
-from auto.orchestrator.config import load_config, save_config
+from auto.orchestrator.config import load_config, mark_owner_reply_consumed, save_config
 from auto.orchestrator.notify import notify_owner
 from auto.orchestrator.parse import extract_decision, extract_developer_mode, extract_instruction
 from auto.orchestrator.prompts import (
@@ -176,7 +176,6 @@ async def bootstrap_master(config, agents) -> tuple[str | None, int | None]:
         master_protocol=protocol,
         escalate_policy=escalate,
         safety_guidelines=safety,
-        max_iterations=config.max_iterations,
     )
     if agents is not None:
         task_out = await send_master(agents, task_prompt)
@@ -277,9 +276,7 @@ async def run_developer_turn(
     inject_owner = None
     if config.owner_reply:
         inject_owner = config.owner_reply
-        config.owner_reply = None
-        if config.config_path:
-            save_config(config)
+        mark_owner_reply_consumed(config, inject_owner)
 
     # Also allow owner clarification embedded in instruction from resume path
     dev_prompt = build_developer_prompt(
@@ -323,8 +320,6 @@ async def run_master_review_turn(
         read_guidelines(config.master_instructions),
         developer_output,
         repo_state,
-        iteration,
-        config.max_iterations,
         master_protocol=protocol,
         escalate_policy=escalate,
         safety_guidelines=safety,

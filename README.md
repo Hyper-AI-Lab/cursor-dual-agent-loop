@@ -18,13 +18,15 @@ In `config.yaml`:
 |-------|---------|
 | `workspace` | Directory agents work in (default `.`) |
 | `model` | e.g. `auto` |
-| `max_iterations` | Hard stop budget |
+| `max_iterations` | Orchestrator hard-stop only (never shown to master as a work budget) |
 | `master_instructions` | File 1 — master context / how to think |
 | `task` | File 2 (path) or inline text — goal the master uses to drive the developer |
 
 Optional: `write_roots` (default whole workspace), `safety_mode` (`"off"` default), `run_dir`, `backend`.
 
 Built-in (not user homework): DECISION protocol, escalate policy, soft safety guidelines.
+`max_iterations` is **not** passed into master prompts (so the master cannot rush to fit a budget).
+Resume fields (`agent` IDs, `last_iteration`) live in `run_dir/run_state.yaml` so owner `config.yaml` is not rewritten.
 Force-stop anytime with `Ctrl+C`.
 
 ## Loop sequence
