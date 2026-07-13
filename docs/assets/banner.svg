@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="cursor-dual-agent-loop">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="55%" stop-color="#132033"/>
+      <stop offset="100%" stop-color="#1a2f28"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#93c5fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <circle cx="1040" cy="120" r="180" fill="#5eead4" opacity="0.08"/>
+  <circle cx="180" cy="520" r="220" fill="#93c5fd" opacity="0.07"/>
+  <text x="80" y="150" fill="#e2e8f0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="54" font-weight="700">cursor-dual-agent-loop</text>
+  <text x="80" y="220" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="30">Autonomous master + developer agents for Cursor</text>
+  <rect x="80" y="280" width="520" height="220" rx="18" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+  <rect x="680" y="280" width="520" height="220" rx="18" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+  <text x="110" y="330" fill="#5eead4" font-family="ui-monospace, monospace" font-size="22">MASTER</text>
+  <text x="110" y="375" fill="#cbd5e1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24">Reviews · CONTINUE / FIX</text>
+  <text x="110" y="415" fill="#cbd5e1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24">STOP / ESCALATE</text>
+  <text x="110" y="465" fill="#64748b" font-family="ui-sans-serif, system-ui, sans-serif" font-size="20">Integrity without babysitting every turn</text>
+  <text x="710" y="330" fill="#93c5fd" font-family="ui-monospace, monospace" font-size="22">DEVELOPER</text>
+  <text x="710" y="375" fill="#cbd5e1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24">Implements · verifies · reports</text>
+  <text x="710" y="415" fill="#cbd5e1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24">Uses your Cursor Auto quota</text>
+  <text x="710" y="465" fill="#64748b" font-family="ui-sans-serif, system-ui, sans-serif" font-size="20">Headless via Cursor SDK / CLI</text>
+  <path d="M600 390 H680" stroke="url(#accent)" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="680,390 665,382 665,398" fill="#93c5fd"/>
+  <text x="80" y="560" fill="#64748b" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22">Spend Auto mode on real work — not on clicking Next</text>
+  <text x="80" y="600" fill="#475569" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18">MIT · Hyper AI Lab · Not affiliated with Cursor Inc.</text>
+</svg>
