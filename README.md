@@ -61,20 +61,27 @@ If you only set `model`, both agents use that same id.
 
 ## Run overnight on a server — not on your open laptop
 
-A lot of people drive Cursor agents from the **desktop app** even when the code lives on a remote machine. That means leaving a laptop open (and awake) for hours — the internet’s unofficial “keep the lid propped” workflow:
+<table>
+<tr>
+<td width="58%" valign="top">
 
-<p align="center">
-  <img src="docs/assets/keep-laptop-open-for-agents.svg" alt="Satirical illustration: keep your agents running 24/7 by propping the laptop open" width="720" />
-</p>
+A lot of people drive Cursor agents from the **desktop app** even when the code lives on a remote machine. That means leaving a laptop open (and awake) for hours — the unofficial “keep the lid propped” workflow.
 
-<p align="center"><em>You shouldn’t need lid-props to ship overnight agent work.</em></p>
-
-**This loop is headless.** Start it on a VPS / remote workstation (screen/tmux/systemd), let it run for tens or hundreds of iterations, and check `COMPLETE.md` / the diff in the morning. Your local machine can sleep.
+**This loop is headless.** Start it on a VPS / remote workstation (`screen` / `tmux` / systemd), let it run for tens or hundreds of iterations, and check `COMPLETE.md` / the diff in the morning. Your local machine can sleep.
 
 | Approach | Where it runs | Your laptop |
 |----------|---------------|-------------|
 | Cursor desktop agent chat | Your GUI session | Must stay awake / open |
 | **This repo (SDK/CLI)** | Remote server process | Can close and walk away |
+
+</td>
+<td width="42%" valign="top" align="center">
+
+<img src="docs/assets/keep-laptop-open-for-agents.png" alt="Meme: when they say keep your agents running 24/7 — laptop propped open with claw clips" width="360" />
+
+</td>
+</tr>
+</table>
 
 ## How it works
 
